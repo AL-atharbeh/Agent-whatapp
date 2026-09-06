@@ -1,0 +1,41 @@
+{
+  "name": "wakeel",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "seed": "tsx scripts/seed.ts",
+    "chat": "tsx scripts/simulate.ts",
+    "verify": "tsx scripts/verify-isolation.ts"
+  },
+  "prisma": {
+    "seed": "tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
+    "@prisma/client": "^6.2.0",
+    "next": "15.5.23",
+    "openai": "^7.10.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "prisma": "^6.2.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5"
+  },
+  "allowScripts": {
+    "prisma@6.19.3": true,
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.28.2": true
+  }
+}

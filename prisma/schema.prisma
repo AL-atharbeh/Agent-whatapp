@@ -1,0 +1,266 @@
+// منصة "وكيل" — وكيل ذكاء اصطناعي لخدمة عملاء البزنسات الصغيرة والمتوسطة.
+//
+// مبدأ العزل: كل جدول يحمل tenantId، وكل استعلام يمر عبر طبقة النطاق
+// (src/lib/tenancy.ts) التي تحقن tenantId إجبارياً. لا يوجد أي مسار في الكود
+// يقرأ بيانات عميل بدون تحديد العميل.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // DATABASE_URL: عبر الـ pooler (منفذ 6543) — للتشغيل العادي
+  url       = env("DATABASE_URL")
+  // DIRECT_URL: اتصال مباشر (منفذ 5432) — يحتاجه Prisma لتطبيق السكيما
+  directUrl = env("DIRECT_URL")
+}
+
+// ═══════════════════════════════════════════════════════════
+//  العميل (البزنس المشترك) — جذر العزل
+// ═══════════════════════════════════════════════════════════
+
+enum TenantStatus {
+  ACTIVE
+  PAUSED
+  SUSPENDED
+}
+
+model Tenant {
+  id           String       @id @default(cuid())
+  slug         String       @unique // يستخدم في رابط الويبهوك: /api/webhooks/meta/<slug>
+  name         String
+  businessType String // gold | clothing | restaurant | pharmacy | clinic | realestate | other
+  status       TenantStatus @default(ACTIVE)
+
+  locale   String @default("ar-JO") // لغة/لهجة الرد
+  timezone String @default("Asia/Amman")
+  currency String @default("JOD")
+
+  // ── إعدادات شخصية الوكيل ──
+  agentName        String  @default("المساعد")
+  tone             String  @default("ودّي ومهذب، جمل قصيرة، بدون مبالغة")
+  modelId          String  @default("claude-opus-5")
+  effort           String  @default("low") // low | medium | high | xhigh | max
+  customPolicy     String? @db.Text // تعليمات إضافية يكتبها صاحب البزنس
+  handoffKeywords  String[] @default([]) // كلمات تفرض التحويل لموظف بشري فوراً
+  maxRepliesPerDay Int      @default(2000) // سقف حماية من الاستنزاف
+
+  profile       BusinessProfile?
+  products      Product[]
+  faqs          Faq[]
+  dataSources   DataSource[]
+  channels      ChannelAccount[]
+  conversations Conversation[]
+  leads         Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BusinessProfile {
+  id       String @id @default(cuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  about          String? @db.Text
+  address        String?
+  mapsUrl        String?
+  phone          String?
+  workingHours   String? // "السبت–الخميس ١٠ص–١٠م، الجمعة مغلق"
+  deliveryPolicy String? @db.Text
+  returnPolicy   String? @db.Text
+  paymentMethods String?
+  websiteUrl     String?
+
+  updatedAt DateTime @updatedAt
+}
+
+// ═══════════════════════════════════════════════════════════
+//  المعرفة: الكتالوج + الأسئلة الشائعة
+// ═══════════════════════════════════════════════════════════
+
+model Product {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  sku         String?
+  name        String
+  description String? @db.Text
+  category    String?
+
+  price     Decimal? @db.Decimal(12, 3)
+  priceUnit String   @default("piece") // piece | gram | kg | hour | night
+  currency  String?
+
+  inStock  Boolean @default(true)
+  quantity Int?
+
+  // خصائص حرة حسب نوع البزنس:
+  // ذهب: { "karat": 21, "weight_g": 12.5, "workmanship_per_g": 3 }
+  // ملابس: { "sizes": ["S","M","L"], "colors": ["أزرق","أسود"] }
+  attributes Json?
+
+  imageUrl String?
+  active   Boolean @default(true)
+
+  // نص مُطبّع للبحث العربي (بدون تشكيل، وتوحيد الألف/الهمزة/التاء المربوطة)
+  searchText String @default("")
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, sku])
+  @@index([tenantId, active])
+  @@index([tenantId, category])
+}
+
+model Faq {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  question String  @db.Text
+  answer   String  @db.Text
+  priority Int     @default(0)
+  active   Boolean @default(true)
+
+  @@index([tenantId, active])
+}
+
+// ═══════════════════════════════════════════════════════════
+//  مصادر البيانات الحيّة (سعر الذهب، مخزون خارجي، ...)
+// ═══════════════════════════════════════════════════════════
+
+enum DataSourceKind {
+  MANUAL // قيمة يحدّثها صاحب البزنس من اللوحة (الأنسب لسعر الذهب اليومي)
+  HTTP_JSON // جلب من API خارجي
+}
+
+model DataSource {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  key         String // معرّف يستخدمه الوكيل، مثل: "gold_price"
+  label       String // وصف بالعربية يظهر للوكيل: "أسعار الذهب اليوم"
+  kind        DataSourceKind @default(MANUAL)
+  config      Json? // HTTP_JSON: { "url": "...", "headers": {...} }
+  value       Json? // آخر قيمة معروفة
+  valueAt     DateTime?
+  staleAfterMinutes Int @default(720) // بعدها تُعتبر القيمة قديمة ولا يُصرّح بها
+  active      Boolean @default(true)
+
+  @@unique([tenantId, key])
+}
+
+// ═══════════════════════════════════════════════════════════
+//  القنوات
+// ═══════════════════════════════════════════════════════════
+
+enum Channel {
+  WHATSAPP
+  MESSENGER
+  INSTAGRAM
+  WEB
+}
+
+model ChannelAccount {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  channel Channel
+
+  // WHATSAPP: phone_number_id | MESSENGER: page_id | INSTAGRAM: ig_account_id
+  externalId String
+
+  // مشفّرة بـ AES-256-GCM قبل التخزين (src/lib/crypto.ts)
+  accessTokenEnc String? @db.Text
+  appSecretEnc   String? @db.Text
+  verifyToken    String?
+
+  displayName String?
+  active      Boolean @default(true)
+
+  @@unique([channel, externalId]) // يمنع ربط نفس الرقم/الصفحة بأكثر من عميل
+  @@index([tenantId])
+}
+
+// ═══════════════════════════════════════════════════════════
+//  المحادثات
+// ═══════════════════════════════════════════════════════════
+
+enum ConversationStatus {
+  BOT // الوكيل يرد
+  HUMAN // محوّلة لموظف بشري — الوكيل صامت
+  CLOSED
+}
+
+enum MessageRole {
+  USER
+  AGENT
+  HUMAN
+  SYSTEM
+}
+
+model Conversation {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  channel        Channel
+  externalUserId String // رقم واتساب العميل أو PSID
+  customerName   String?
+
+  status        ConversationStatus @default(BOT)
+  handoffReason String?            @db.Text
+  handoffAt     DateTime?
+
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  lastMessageAt DateTime @default(now())
+
+  @@unique([tenantId, channel, externalUserId])
+  @@index([tenantId, status, lastMessageAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  tenantId       String
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role MessageRole
+  text String      @db.Text
+
+  externalId String? // معرّف الرسالة عند Meta — لمنع المعالجة المكرّرة
+  toolCalls  Json? // ما استدعاه الوكيل خلال هذا الرد (للتدقيق)
+  usage      Json? // { input_tokens, output_tokens, cache_read_input_tokens }
+
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, externalId])
+  @@index([conversationId, createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════
+//  العملاء المحتملون (يلتقطهم الوكيل أثناء المحادثة)
+// ═══════════════════════════════════════════════════════════
+
+model Lead {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name           String?
+  phone          String?
+  channel        Channel
+  externalUserId String?
+  interest       String  @db.Text
+  notes          String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}
