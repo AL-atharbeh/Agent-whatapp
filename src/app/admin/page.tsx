@@ -15,7 +15,12 @@ export default async function AdminHome() {
 
   return (
     <main className="wide">
-      <h1>لوحة التحكم</h1>
+      <div className="row">
+        <h1>لوحة التحكم</h1>
+        <a href="/logout" style={{ color: "var(--muted)", fontSize: 13 }}>
+          تسجيل الخروج
+        </a>
+      </div>
       <p className="sub">أضف متجرك، عبّي بياناته، وجرّب وكيله — كل شي من هون.</p>
 
       <details className="card">
