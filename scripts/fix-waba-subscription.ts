@@ -45,6 +45,28 @@ async function main() {
   }
   console.log("✅ صالح —", JSON.stringify(me.body));
 
+  // صلاحية التوكن الآن لا تكفي: توكن الـ٢٤ ساعة يبدو صالحاً وقت إنشائه أيضاً.
+  // expires_at = 0 هو الفرق بين منتج يعمل وبوت يموت صامتاً بعد يوم.
+  const dbg = await call(`debug_token?input_token=${token}&access_token=${token}`);
+  const d = dbg.body.data;
+  if (d) {
+    const permanent = d.expires_at === 0;
+    console.log(`   النوع: ${d.type}`);
+    console.log(
+      `   الانتهاء: ${
+        permanent
+          ? "🎉 مطلقاً — توكن دائم"
+          : `⚠️ ${new Date(d.expires_at * 1000).toLocaleString("ar-JO")}`
+      }`,
+    );
+    if (!permanent) {
+      console.log(
+        "\n   🚨 توكن مؤقت! سيتوقف البوت عند انتهائه. أنشئ توكن System User",
+        "بانتهاء صلاحية «مطلقًا» قبل تسليم أي عميل.\n",
+      );
+    }
+  }
+
   // ── ٢) اشتراك التطبيق في WABA ──
   console.log("\n═══ ٢) اشتراك التطبيق في حساب واتساب التجاري ═══");
   const subs = await call(`${WABA}/subscribed_apps`);

@@ -16,6 +16,13 @@ const slug = process.argv[2] ?? "shahad";
 const text = process.argv[3] ?? "مرحبا";
 const BASE = process.env.SIMULATE_BASE_URL ?? "https://agent-whatapp.vercel.app";
 
+/**
+ * --shared يختبر الويبهوك المشترك (/api/webhooks/meta) بدل المخصص.
+ * يوقّع بـ META_APP_SECRET لأن كل العملاء على تطبيق Meta واحد، ويثبت أن
+ * التوجيه للعميل الصحيح يتم من phone_number_id وحده.
+ */
+const shared = process.argv.includes("--shared");
+
 async function main() {
   const tenant = await prisma.tenant.findUnique({
     where: { slug },
@@ -25,9 +32,18 @@ async function main() {
 
   const account = tenant.channels[0];
   if (!account) return console.error("لا توجد قناة واتساب مربوطة لهذا المتجر");
-  if (!account.appSecretEnc) return console.error("App Secret غير محفوظ في القناة");
 
-  const appSecret = decrypt(account.appSecretEnc);
+  let appSecret: string;
+  if (shared) {
+    if (!process.env.META_APP_SECRET) {
+      return console.error("META_APP_SECRET غير مضبوط في .env — مطلوب للويبهوك المشترك");
+    }
+    appSecret = process.env.META_APP_SECRET;
+  } else {
+    if (!account.appSecretEnc) return console.error("App Secret غير محفوظ في القناة");
+    appSecret = decrypt(account.appSecretEnc);
+  }
+
   const from = "962776719225";
   const messageId = `wamid.SIM${Date.now()}`;
 
@@ -67,8 +83,10 @@ async function main() {
   const signature =
     "sha256=" + crypto.createHmac("sha256", appSecret).update(raw, "utf8").digest("hex");
 
-  const url = `${BASE}/api/webhooks/meta/${slug}`;
+  const url = shared ? `${BASE}/api/webhooks/meta` : `${BASE}/api/webhooks/meta/${slug}`;
   console.log(`\n📤 إرسال رسالة محاكاة إلى ${url}`);
+  console.log(`   الوضع: ${shared ? "ويبهوك مشترك (توجيه بالرقم)" : "ويبهوك مخصص للمتجر"}`);
+  console.log(`   المتجر المتوقع: ${tenant.name}`);
   console.log(`   من: +${from}   النص: "${text}"\n`);
 
   const res = await fetch(url, {
