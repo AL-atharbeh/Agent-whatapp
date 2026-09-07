@@ -30,7 +30,7 @@ export default async function TenantLayout({
   return (
     <main className="wide">
       <div className="row" style={{ marginBottom: 10 }}>
-        <Link href="/admin" style={{ color: "var(--text-dim)", fontSize: 13.5 }}>
+        <Link href="/admin" style={{ color: "var(--text-3)", fontSize: 13.5 }}>
           ← كل المتاجر
         </Link>
         <Link className="btn ghost" href={`/playground/${tenant.slug}`}>

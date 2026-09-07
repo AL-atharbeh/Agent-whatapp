@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "سياسة الخصوصية — وكيل",
+  title: "سياسة الخصوصية — حاضر",
   description: "كيف نجمع بيانات محادثات خدمة العملاء ونستخدمها ونحميها.",
 };
 
@@ -15,7 +15,7 @@ export default function PrivacyPage() {
 
       <div className="card">
         <p style={{ marginTop: 0 }}>
-          «وكيل» منصة تتيح للأنشطة التجارية الرد على استفسارات عملائها تلقائياً عبر
+          «حاضر» منصة تتيح للأنشطة التجارية الرد على استفسارات عملائها تلقائياً عبر
           واتساب وفيسبوك ماسنجر وانستقرام باستخدام الذكاء الاصطناعي. توضّح هذه الصفحة
           البيانات التي نعالجها، وسبب معالجتها، ومدة الاحتفاظ بها.
         </p>
@@ -98,13 +98,13 @@ export default function PrivacyPage() {
         <p style={{ marginTop: 0 }}>
           لك الحق في طلب نسخة من بياناتك، أو تصحيحها، أو حذفها نهائياً. راسلنا على البريد
           أدناه، أو اتبع{" "}
-          <a href="/data-deletion" style={{ color: "var(--accent)" }}>
+          <a href="/data-deletion" style={{ color: "var(--live)" }}>
             تعليمات حذف البيانات
           </a>
           . نستجيب خلال ثلاثين يوماً.
         </p>
         <p style={{ marginBottom: 0 }}>
-          إن راسلت نشاطاً تجارياً يستخدم «وكيل» وأردت التوقف، اكتب «إيقاف» في المحادثة
+          إن راسلت نشاطاً تجارياً يستخدم «حاضر» وأردت التوقف، اكتب «إيقاف» في المحادثة
           أو احظر الرقم من تطبيق المراسلة.
         </p>
       </div>
@@ -124,7 +124,7 @@ export default function PrivacyPage() {
         </p>
         <p style={{ marginBottom: 0 }}>
           للاستفسارات أو طلبات البيانات:{" "}
-          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--accent)" }}>
+          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--live)" }}>
             bashar188yousef@gmail.com
           </a>
         </p>
@@ -134,7 +134,7 @@ export default function PrivacyPage() {
       <h2 style={{ marginTop: 40 }}>Privacy Policy (English summary)</h2>
       <div className="card" dir="ltr" style={{ textAlign: "left" }}>
         <p style={{ marginTop: 0 }}>
-          <strong>Wakeel</strong> lets businesses answer customer enquiries automatically
+          <strong>HADER</strong> lets businesses answer customer enquiries automatically
           on WhatsApp, Messenger and Instagram using AI.
         </p>
         <p>
@@ -164,10 +164,10 @@ export default function PrivacyPage() {
         </p>
         <p style={{ marginBottom: 0 }}>
           <strong>Contact:</strong>{" "}
-          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--accent)" }}>
+          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--live)" }}>
             bashar188yousef@gmail.com
           </a>{" "}
-          · <a href="/data-deletion" style={{ color: "var(--accent)" }}>Data deletion</a>
+          · <a href="/data-deletion" style={{ color: "var(--live)" }}>Data deletion</a>
         </p>
       </div>
     </>

@@ -115,7 +115,7 @@ export default async function Readiness({
           <div className="check-item" key={c.label}>
             <span
               className="check-mark"
-              style={{ color: c.ok ? "var(--accent)" : "var(--text-faint)" }}
+              style={{ color: c.ok ? "var(--live)" : "var(--text-3)" }}
             >
               {c.ok ? "✓" : "○"}
             </span>

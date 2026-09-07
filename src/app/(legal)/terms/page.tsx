@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "شروط الاستخدام — وكيل",
-  description: "شروط استخدام منصة وكيل لخدمة عملاء الأنشطة التجارية.",
+  title: "شروط الاستخدام — حاضر",
+  description: "شروط استخدام منصة حاضر لخدمة عملاء الأنشطة التجارية.",
 };
 
 export default function TermsPage() {
@@ -14,7 +14,7 @@ export default function TermsPage() {
       <h2>١. الخدمة</h2>
       <div className="card">
         <p style={{ margin: 0 }}>
-          توفّر «وكيل» للأنشطة التجارية وكيل ذكاء اصطناعي يرد على استفسارات عملائها عبر
+          توفّر «حاضر» للأنشطة التجارية وكيل ذكاء اصطناعي يرد على استفسارات عملائها عبر
           واتساب وفيسبوك ماسنجر وانستقرام، اعتماداً على المعلومات التي يدخلها صاحب النشاط
           بنفسه.
         </p>
@@ -63,7 +63,7 @@ export default function TermsPage() {
         <p style={{ margin: 0 }}>
           يمكن لأي طرف إنهاء الخدمة في أي وقت. عند الإنهاء تُحذف بيانات النشاط التجاري
           خلال ثلاثين يوماً — انظر{" "}
-          <a href="/privacy" style={{ color: "var(--accent)" }}>
+          <a href="/privacy" style={{ color: "var(--live)" }}>
             سياسة الخصوصية
           </a>
           .
@@ -73,7 +73,7 @@ export default function TermsPage() {
       <h2>٦. التواصل</h2>
       <div className="card">
         <p style={{ margin: 0 }}>
-          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--accent)" }}>
+          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--live)" }}>
             bashar188yousef@gmail.com
           </a>
         </p>

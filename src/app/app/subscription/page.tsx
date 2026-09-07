@@ -1,6 +1,8 @@
 import { requireOwnTenant } from "@/lib/session";
 import { listPlans, getPlan, SUBSCRIPTION_LABEL } from "@/lib/plans";
 import { requestPlan } from "@/app/(billing)/actions";
+import { Reveal } from "@/components/motion";
+import { IconCheck } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -81,14 +83,12 @@ export default async function SubscriptionPage({
 
           return (
             <div
-              className="card"
+              className={`card${p.highlight ? " featured" : ""}`}
               key={p.tier}
               style={{
                 margin: 0,
                 display: "flex",
                 flexDirection: "column",
-                borderColor: p.highlight ? "var(--accent)" : undefined,
-                borderWidth: p.highlight ? 2 : 1,
               }}
             >
               <div className="row" style={{ marginBottom: 4 }}>
@@ -105,7 +105,7 @@ export default async function SubscriptionPage({
                 <span style={{ fontSize: 30, fontWeight: 700, letterSpacing: "-0.02em" }}>
                   {p.monthlyPrice}
                 </span>
-                <span style={{ color: "var(--text-dim)", fontSize: 14 }}> دينار / شهر</span>
+                <span style={{ color: "var(--text-3)", fontSize: 14 }}> دينار / شهر</span>
               </div>
 
               <ul
@@ -119,9 +119,9 @@ export default async function SubscriptionPage({
                 }}
               >
                 {p.features.map((f) => (
-                  <li key={f} style={{ display: "flex", gap: 8 }}>
-                    <span style={{ color: "var(--accent)", flex: "none" }}>✓</span>
-                    {f}
+                  <li key={f} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span style={{ color: "var(--live)", flex: "none", display: "flex" }}><IconCheck size={16} /></span>
+                    <span>{f}</span>
                   </li>
                 ))}
               </ul>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin, currentUser } from "@/lib/session";
 import { logout } from "../(auth)/actions";
+import { Logo } from "@/components/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -12,17 +13,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <>
       <header className="topbar">
         <div className="topbar-inner">
-          <Link href="/admin" className="brand">
-            <span className="brand-mark">و</span>
-            وكيل
-            <span className="pill" style={{ marginInlineStart: 4 }}>
-              لوحة المنصة
-            </span>
+          <Link href="/admin" className="logo">
+            <Logo size={30} />
+            <span className="pill">المنصة</span>
           </Link>
           <div className="topbar-actions">
-            <span>{user?.email}</span>
+            <Link href="/admin/plans">الباقات</Link>
+            <span style={{ color: "var(--text-3)" }}>{user?.email}</span>
             <form action={logout}>
-              <button type="submit" className="ghost" style={{ padding: "5px 12px" }}>
+              <button type="submit" className="ghost" style={{ padding: "6px 14px" }}>
                 خروج
               </button>
             </form>

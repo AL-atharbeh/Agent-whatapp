@@ -74,7 +74,11 @@ export default function Chat({ slug, agentName }: { slug: string; agentName: str
             )}
           </div>
         ))}
-        {busy && <div className="meta">{agentName} يكتب…</div>}
+        {busy && (
+          <div className="typing">
+            <i /><i /><i />
+          </div>
+        )}
 
         {handedOff && (
           <div

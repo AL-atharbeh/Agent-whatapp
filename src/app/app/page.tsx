@@ -2,6 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireOwnTenant } from "@/lib/session";
 import Readiness from "@/app/admin/[slug]/readiness";
+import { Reveal, Counter } from "@/components/motion";
+import { IconChart, IconChat, IconClock, IconBrain, IconSpark } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -39,28 +41,35 @@ export default async function PortalHome({
       <h1>{tenant.name}</h1>
       <p className="sub">وكيلك «{tenant.agentName}» — لوحة إدارته</p>
 
-      <div className="stats">
-        <div className="stat">
-          <div className="stat-value">{products}</div>
-          <div className="stat-label">منتج في الكتالوج</div>
+      <Reveal>
+        <div className="stats">
+          <div className="stat">
+            <span className="stat-icon"><IconSpark size={22} /></span>
+            <div className="stat-value"><Counter value={products} /></div>
+            <div className="stat-label">منتج في الكتالوج</div>
+          </div>
+          <div className="stat">
+            <span className="stat-icon"><IconBrain size={22} /></span>
+            <div className="stat-value"><Counter value={faqs} /></div>
+            <div className="stat-label">سؤال شائع</div>
+          </div>
+          <div className="stat">
+            <span className="stat-icon"><IconChat size={22} /></span>
+            <div className="stat-value"><Counter value={convos} /></div>
+            <div className="stat-label">محادثة</div>
+          </div>
+          <div className="stat">
+            <span className="stat-icon"><IconChart size={22} /></span>
+            <div className="stat-value"><Counter value={leads} /></div>
+            <div className="stat-label">عميل محتمل</div>
+          </div>
+          <div className="stat">
+            <span className="stat-icon"><IconClock size={22} /></span>
+            <div className="stat-value"><Counter value={todayReplies} /></div>
+            <div className="stat-label">رد اليوم</div>
+          </div>
         </div>
-        <div className="stat">
-          <div className="stat-value">{faqs}</div>
-          <div className="stat-label">سؤال شائع</div>
-        </div>
-        <div className="stat">
-          <div className="stat-value">{convos}</div>
-          <div className="stat-label">محادثة</div>
-        </div>
-        <div className="stat">
-          <div className="stat-value">{leads}</div>
-          <div className="stat-label">عميل محتمل</div>
-        </div>
-        <div className="stat">
-          <div className="stat-value">{todayReplies}</div>
-          <div className="stat-label">رد اليوم</div>
-        </div>
-      </div>
+      </Reveal>
 
       <Readiness slug={tenant.slug} hideChannels />
 

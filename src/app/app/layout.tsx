@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireOwnTenant } from "@/lib/session";
 import { logout } from "../(auth)/actions";
 import PortalTabs from "./tabs";
+import { Logo } from "@/components/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +19,8 @@ export default async function PortalLayout({ children }: { children: React.React
     <>
       <header className="topbar">
         <div className="topbar-inner">
-          <Link href="/app" className="brand">
-            <span className="brand-mark">و</span>
-            وكيل
+          <Link href="/app" className="logo">
+            <Logo size={30} />
           </Link>
           <div className="topbar-actions">
             <span>{tenant.name}</span>

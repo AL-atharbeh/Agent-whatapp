@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { createTenant } from "./actions";
 import { BUSINESS_TYPES } from "./types";
 import { listPlans, SUBSCRIPTION_LABEL } from "@/lib/plans";
+import { Reveal, Counter } from "@/components/motion";
+import { IconUsers, IconBolt, IconChat, IconChart, IconClock } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -55,36 +57,39 @@ export default async function AdminHome() {
       </div>
       <p className="sub">كل المتاجر المشتركة — بياناتها معزولة تماماً عن بعضها.</p>
 
-      <div className="stats">
-        <div className="stat">
-          <div className="stat-value">{allTenants}</div>
-          <div className="stat-label">متجر</div>
-        </div>
-        <div className="stat">
-          <div className="stat-value" style={{ color: "var(--accent)" }}>
-            {active}
+      <Reveal>
+        <div className="stats">
+          <div className="stat">
+            <span className="stat-icon"><IconUsers size={22} /></span>
+            <div className="stat-value"><Counter value={allTenants} /></div>
+            <div className="stat-label">متجر</div>
           </div>
-          <div className="stat-label">نشط</div>
-        </div>
-        <div className="stat">
-          <div className="stat-value">{convos}</div>
-          <div className="stat-label">محادثة</div>
-        </div>
-        <div className="stat">
-          <div className="stat-value">{leads}</div>
-          <div className="stat-label">عميل محتمل</div>
-        </div>
-        <div className="stat">
-          <div className="stat-value">{todayReplies}</div>
-          <div className="stat-label">رد اليوم</div>
-        </div>
-        <div className="stat">
-          <div className="stat-value" style={{ color: "var(--accent)" }}>
-            {mrr}
+          <div className="stat">
+            <span className="stat-icon"><IconBolt size={22} /></span>
+            <div className="stat-value live"><Counter value={active} /></div>
+            <div className="stat-label">نشط</div>
           </div>
-          <div className="stat-label">دينار / شهر</div>
+          <div className="stat">
+            <span className="stat-icon"><IconChat size={22} /></span>
+            <div className="stat-value"><Counter value={convos} /></div>
+            <div className="stat-label">محادثة</div>
+          </div>
+          <div className="stat">
+            <span className="stat-icon"><IconChart size={22} /></span>
+            <div className="stat-value"><Counter value={leads} /></div>
+            <div className="stat-label">عميل محتمل</div>
+          </div>
+          <div className="stat">
+            <span className="stat-icon"><IconClock size={22} /></span>
+            <div className="stat-value"><Counter value={todayReplies} /></div>
+            <div className="stat-label">رد اليوم</div>
+          </div>
+          <div className="stat">
+            <div className="stat-value live"><Counter value={mrr} /></div>
+            <div className="stat-label">دينار / شهر</div>
+          </div>
         </div>
-      </div>
+      </Reveal>
 
       {pending.length > 0 && (
         <div className="alert warn">

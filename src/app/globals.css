@@ -1,54 +1,59 @@
 /* ═══════════════════════════════════════════════════════════
-   نظام تصميم «وكيل»
-   لوحة محايدة + أخضر واحد للفعل. كل قيمة متغيّر، فالثيم يتبدّل
-   من مكان واحد ولا يُكتب لون خام في أي مكون.
+   نظام تصميم «حاضر» — HADER
+   ───────────────────────────────────────────────────────────
+   مبني من اللوجو: أسود عميق، أبيض حاد، ولون واحد للحياة —
+   «أخضر الحضور» المأخوذ من نقطة المسّاح. اللون لا يُستخدم للزينة،
+   بل لما هو حيّ فقط: متصل، نشط، ناجح.
    ═══════════════════════════════════════════════════════════ */
 
 :root {
-  --bg: #0b0d11;
-  --surface: #14171d;
-  --surface-2: #1b1f27;
-  --border: #262b35;
-  --border-strong: #333a47;
+  /* الأساس */
+  --bg: #09090b;
+  --bg-2: #0d0e12;
+  --surface: #131418;
+  --surface-2: #191b21;
+  --surface-3: #20222a;
 
-  --text: #e8eaef;
-  --text-dim: #9aa3b2;
-  --text-faint: #6b7280;
+  --border: #24262e;
+  --border-2: #2f323c;
+  --border-glow: #3a3d49;
 
-  --accent: #22c55e;
-  --accent-dim: #16a34a;
-  --accent-fg: #04140a;
-  --accent-soft: #22c55e1a;
+  --text: #f4f4f5;
+  --text-2: #a1a1aa;
+  --text-3: #6b6d76;
 
+  /* لون العلامة الوحيد */
+  --live: #34d399;
+  --live-2: #10b981;
+  --live-dim: #34d39926;
+  --live-glow: #34d39940;
+  --on-live: #04140c;
+
+  /* حالات */
   --warn: #fbbf24;
-  --danger: #f87171;
+  --warn-dim: #fbbf2418;
+  --danger: #fb7185;
+  --danger-dim: #fb718518;
 
-  --r-sm: 8px;
-  --r: 12px;
-  --r-lg: 16px;
+  /* أنصاف أقطار */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
 
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5);
-}
+  /* ظلال */
+  --sh-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --sh: 0 4px 16px -4px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.3);
+  --sh-lg: 0 24px 60px -20px rgb(0 0 0 / 0.7), 0 2px 8px rgb(0 0 0 / 0.35);
+  --sh-live: 0 0 0 1px var(--live-glow), 0 8px 32px -8px var(--live-glow);
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f7f8fa;
-    --surface: #ffffff;
-    --surface-2: #f2f4f7;
-    --border: #e4e7ec;
-    --border-strong: #d0d5dd;
+  /* حركة */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --t: 0.24s var(--ease);
 
-    --text: #101828;
-    --text-dim: #667085;
-    --text-faint: #98a2b3;
-
-    --accent: #16a34a;
-    --accent-dim: #15803d;
-    --accent-fg: #ffffff;
-    --accent-soft: #16a34a14;
-
-    --shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 8px 24px -12px rgb(16 24 40 / 0.12);
-  }
+  color-scheme: dark;
 }
 
 * {
@@ -57,124 +62,193 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
+  min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font-family: "SF Arabic", -apple-system, "Segoe UI", system-ui, Tahoma, sans-serif;
-  line-height: 1.7;
+  font-family: var(--font-ui), "SF Arabic", system-ui, sans-serif;
   font-size: 15px;
+  line-height: 1.75;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
-/* ─────────── تخطيط ─────────── */
+/* ─────────── خلفية حيّة ───────────
+   وهج ثابت لا يتحرك ولا يشتّت: يعطي عمقاً للأسود بدل أن يكون مسطّحاً. */
+
+.bg-fx {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 40rem at 78% -8%, #34d3990e, transparent 62%),
+    radial-gradient(48rem 34rem at 8% 4%, #ffffff08, transparent 60%),
+    linear-gradient(180deg, var(--bg-2), var(--bg) 42%);
+}
+
+/* شبكة خفيفة جداً — تُحسّ ولا تُرى */
+.bg-fx::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.4;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(70rem 46rem at 50% -10%, #000 20%, transparent 78%);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   العلامة
+   ═══════════════════════════════════════════════════════════ */
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.logo-text {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.wordmark {
+  font-family: var(--font-mark), var(--font-ui), sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.logo-ar {
+  font-size: 13px;
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+.brand-svg .brand-face {
+  fill: var(--bg);
+}
+
+/* نبض الحضور — الحركة الوحيدة في العلامة */
+.antenna-dot {
+  fill: var(--live);
+  animation: dot-breathe 2.6s var(--ease-in-out) infinite;
+  transform-origin: 66px 13px;
+}
+
+.antenna-ring {
+  fill: none;
+  stroke: var(--live);
+  stroke-width: 2;
+  transform-origin: 66px 13px;
+  animation: ring-out 2.6s var(--ease) infinite;
+}
+
+@keyframes dot-breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.72; transform: scale(0.9); }
+}
+
+@keyframes ring-out {
+  0% { opacity: 0.5; transform: scale(1); }
+  70%, 100% { opacity: 0; transform: scale(2.4); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   التخطيط
+   ═══════════════════════════════════════════════════════════ */
 
 main {
-  max-width: 940px;
+  max-width: 1000px;
   margin: 0 auto;
-  padding: 28px 20px 80px;
+  padding: 32px 22px 96px;
 }
 
-main.wide {
-  max-width: 1180px;
-}
-
-main.narrow {
-  max-width: 460px;
-  padding-top: 8vh;
-}
+main.wide { max-width: 1240px; }
+main.narrow { max-width: 470px; padding-top: 7vh; }
 
 h1 {
-  font-size: 26px;
+  font-size: clamp(24px, 3.4vw, 32px);
   font-weight: 700;
-  letter-spacing: -0.02em;
-  margin: 0 0 6px;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+  margin: 0 0 8px;
 }
 
 h2 {
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 650;
-  margin: 32px 0 14px;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
+  margin: 40px 0 16px;
 }
 
 h3 {
-  font-size: 15px;
+  font-size: 15.5px;
   font-weight: 650;
   margin: 0 0 10px;
+  letter-spacing: -0.01em;
 }
 
 .sub {
-  color: var(--text-dim);
-  margin: 0 0 24px;
-  font-size: 14px;
+  color: var(--text-2);
+  margin: 0 0 28px;
+  font-size: 14.5px;
 }
 
 .hint {
   font-size: 12.5px;
-  color: var(--text-dim);
-  margin: -4px 0 14px;
-  line-height: 1.6;
+  color: var(--text-3);
+  margin: -2px 0 14px;
+  line-height: 1.7;
 }
+
+a { color: var(--live); text-decoration: none; transition: color var(--t); }
+a:hover { color: var(--live-2); }
 
 code {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 0.88em;
+  font-size: 0.86em;
   background: var(--surface-2);
-  padding: 1px 6px;
-  border-radius: 5px;
+  padding: 2px 7px;
+  border-radius: var(--r-xs);
   border: 1px solid var(--border);
+  color: var(--text-2);
 }
 
-a {
-  color: var(--accent);
-}
-
-/* ─────────── شريط علوي ─────────── */
+/* ═══════════════════════════════════════════════════════════
+   الشريط العلوي
+   ═══════════════════════════════════════════════════════════ */
 
 .topbar {
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 80%, transparent);
-  backdrop-filter: saturate(180%) blur(12px);
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: 60;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
 }
 
 .topbar-inner {
-  max-width: 1180px;
+  max-width: 1240px;
   margin: 0 auto;
-  padding: 0 20px;
-  height: 56px;
+  padding: 0 22px;
+  height: 62px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-weight: 700;
-  font-size: 16px;
-  color: var(--text);
-  text-decoration: none;
-  letter-spacing: -0.01em;
-}
-
-.brand-mark {
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  background: var(--accent);
-  color: var(--accent-fg);
-  display: grid;
-  place-items: center;
-  font-size: 14px;
-  font-weight: 800;
+  gap: 18px;
 }
 
 .topbar-actions {
@@ -182,117 +256,175 @@ a {
   align-items: center;
   gap: 14px;
   font-size: 13px;
-  color: var(--text-dim);
+  color: var(--text-3);
 }
 
-.topbar-actions a {
-  color: var(--text-dim);
-  text-decoration: none;
-}
+.topbar-actions a { color: var(--text-2); }
+.topbar-actions a:hover { color: var(--text); }
 
-.topbar-actions a:hover {
-  color: var(--text);
-}
-
-/* ─────────── بطاقات ─────────── */
+/* ═══════════════════════════════════════════════════════════
+   البطاقات
+   ═══════════════════════════════════════════════════════════ */
 
 .card {
-  background: var(--surface);
+  position: relative;
+  background: linear-gradient(180deg, var(--surface), var(--bg-2));
   border: 1px solid var(--border);
   border-radius: var(--r);
-  padding: 18px 20px;
+  padding: 20px 22px;
   margin-bottom: 14px;
+  transition: border-color var(--t), transform var(--t), box-shadow var(--t);
 }
 
-.card.pad-lg {
-  padding: 24px;
+.card.pad-lg { padding: 28px; }
+.card.raised { box-shadow: var(--sh-lg); }
+
+.card.interactive:hover {
+  border-color: var(--border-glow);
+  transform: translateY(-2px);
+  box-shadow: var(--sh);
 }
 
-.card.raised {
-  box-shadow: var(--shadow);
+/* بطاقة مميّزة — إطار متدرّج بلون العلامة */
+.card.featured {
+  border-color: transparent;
+  background:
+    linear-gradient(180deg, var(--surface), var(--bg-2)) padding-box,
+    linear-gradient(160deg, var(--live), transparent 55%) border-box;
+  border: 1.5px solid transparent;
 }
 
 .row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
-/* ─────────── إحصاءات ─────────── */
+/* ═══════════════════════════════════════════════════════════
+   الإحصاءات
+   ═══════════════════════════════════════════════════════════ */
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .stat {
-  background: var(--surface);
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--surface), var(--bg-2));
   border: 1px solid var(--border);
   border-radius: var(--r);
-  padding: 16px 18px;
+  padding: 18px 20px;
+  transition: border-color var(--t), transform var(--t);
 }
 
-.stat-value {
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
+.stat:hover {
+  border-color: var(--border-glow);
+  transform: translateY(-2px);
 }
+
+/* خط علوي يضيء عند المرور */
+.stat::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--live), transparent);
+  opacity: 0;
+  transition: opacity var(--t);
+}
+
+.stat:hover::before { opacity: 0.7; }
+
+.stat-value {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-value.live { color: var(--live); }
 
 .stat-label {
   font-size: 12.5px;
-  color: var(--text-dim);
-  margin-top: 2px;
+  color: var(--text-3);
+  margin-top: 3px;
 }
 
-/* ─────────── تبويبات ─────────── */
+.stat-icon {
+  position: absolute;
+  inset-inline-end: 16px;
+  top: 16px;
+  color: var(--text-3);
+  opacity: 0.35;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   التبويبات
+   ═══════════════════════════════════════════════════════════ */
 
 .tabs {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   flex-wrap: wrap;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 24px;
-  padding-bottom: 0;
+  margin-bottom: 28px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+
+.tabs::-webkit-scrollbar { display: none; }
 
 .tabs a {
-  color: var(--text-dim);
-  text-decoration: none;
-  padding: 9px 14px;
+  position: relative;
+  color: var(--text-3);
+  padding: 11px 15px;
   font-size: 14px;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  transition: color 0.12s;
   white-space: nowrap;
+  transition: color var(--t);
 }
 
-.tabs a:hover {
-  color: var(--text);
+.tabs a:hover { color: var(--text-2); }
+.tabs a.active { color: var(--text); font-weight: 600; }
+
+.tabs a.active::after {
+  content: "";
+  position: absolute;
+  inset-inline: 12px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--live);
+  border-radius: 2px 2px 0 0;
+  box-shadow: 0 0 12px var(--live-glow);
+  animation: tab-in 0.3s var(--ease);
 }
 
-.tabs a.active {
-  color: var(--text);
-  font-weight: 600;
-  border-bottom-color: var(--accent);
+@keyframes tab-in {
+  from { transform: scaleX(0); opacity: 0; }
+  to { transform: scaleX(1); opacity: 1; }
 }
 
-/* ─────────── نماذج ─────────── */
+/* ═══════════════════════════════════════════════════════════
+   النماذج
+   ═══════════════════════════════════════════════════════════ */
 
 label {
   display: block;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   font-size: 13px;
-  color: var(--text-dim);
+  color: var(--text-2);
 }
 
 label > span {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 7px;
   font-weight: 500;
 }
 
@@ -303,33 +435,31 @@ input[type="password"],
 textarea,
 select {
   width: 100%;
-  background: var(--bg);
-  border: 1px solid var(--border-strong);
+  background: var(--bg-2);
+  border: 1px solid var(--border-2);
   border-radius: var(--r-sm);
-  padding: 10px 12px;
+  padding: 11px 13px;
   color: var(--text);
   font: inherit;
   font-size: 14px;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition: border-color var(--t), box-shadow var(--t), background var(--t);
 }
 
-input:focus,
-textarea:focus,
-select:focus {
+input:hover, textarea:hover, select:hover { border-color: var(--border-glow); }
+
+input:focus, textarea:focus, select:focus {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  background: var(--surface);
+  border-color: var(--live);
+  box-shadow: 0 0 0 3px var(--live-dim);
 }
 
-input::placeholder,
-textarea::placeholder {
-  color: var(--text-faint);
-}
+input::placeholder, textarea::placeholder { color: var(--text-3); }
 
 textarea {
   resize: vertical;
-  min-height: 74px;
-  line-height: 1.65;
+  min-height: 80px;
+  line-height: 1.7;
 }
 
 textarea.code {
@@ -339,187 +469,234 @@ textarea.code {
   text-align: left;
 }
 
-.grid2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0 16px;
+select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%),
+    linear-gradient(135deg, var(--text-3) 50%, transparent 50%);
+  background-position: calc(14px) calc(50% - 2px), calc(19px) calc(50% - 2px);
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  padding-inline-start: 34px;
 }
 
-.grid3 {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0 16px;
-}
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 18px; }
 
-@media (max-width: 720px) {
-  .grid2,
-  .grid3 {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 760px) {
+  .grid2, .grid3 { grid-template-columns: 1fr; }
 }
 
 .checkline {
   display: flex;
   align-items: center;
-  gap: 9px;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 15px;
   font-size: 14px;
   color: var(--text);
 }
 
 .checkline input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent);
+  width: 17px;
+  height: 17px;
+  accent-color: var(--live);
   flex: none;
+  cursor: pointer;
 }
 
-/* ─────────── أزرار ─────────── */
+/* ═══════════════════════════════════════════════════════════
+   الأزرار
+   ═══════════════════════════════════════════════════════════ */
 
-a.btn,
-button {
-  background: var(--accent);
-  color: var(--accent-fg);
+a.btn, button {
+  position: relative;
+  overflow: hidden;
+  background: var(--live);
+  color: var(--on-live);
   border: 1px solid transparent;
   border-radius: var(--r-sm);
-  padding: 9px 18px;
+  padding: 10px 20px;
   font: inherit;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 650;
   cursor: pointer;
-  text-decoration: none;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  transition: background 0.12s, opacity 0.12s;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.15s var(--ease), box-shadow var(--t), background var(--t),
+    opacity var(--t);
   white-space: nowrap;
 }
 
-a.btn:hover,
-button:hover:not(:disabled) {
-  background: var(--accent-dim);
+a.btn:hover, button:hover:not(:disabled) {
+  background: var(--live);
+  color: var(--on-live);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px -6px var(--live-glow);
 }
 
-button:disabled {
-  opacity: 0.45;
-  cursor: default;
+a.btn:active, button:active:not(:disabled) { transform: translateY(0); }
+
+/* لمعة تمر عند المرور */
+a.btn::after, button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, #ffffff40 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.6s var(--ease);
 }
 
-button.ghost,
-a.btn.ghost {
-  background: transparent;
-  color: var(--text-dim);
-  border-color: var(--border-strong);
-}
+a.btn:hover::after, button:hover:not(:disabled)::after { transform: translateX(120%); }
 
-button.ghost:hover,
-a.btn.ghost:hover {
+button:disabled { opacity: 0.4; cursor: default; }
+button:disabled::after { display: none; }
+
+button.ghost, a.btn.ghost {
   background: var(--surface-2);
+  color: var(--text-2);
+  border-color: var(--border-2);
+}
+
+button.ghost:hover, a.btn.ghost:hover {
+  background: var(--surface-3);
   color: var(--text);
+  border-color: var(--border-glow);
+  box-shadow: none;
 }
 
 button.danger {
   background: transparent;
   color: var(--danger);
-  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
 }
 
 button.danger:hover {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  background: var(--danger-dim);
+  color: var(--danger);
+  box-shadow: none;
 }
 
-button.block {
-  width: 100%;
-  justify-content: center;
-}
+button.block, a.btn.block { width: 100%; }
 
-/* ─────────── شارات ─────────── */
+button.lg, a.btn.lg { padding: 13px 28px; font-size: 15px; border-radius: var(--r); }
+
+/* ═══════════════════════════════════════════════════════════
+   الشارات
+   ═══════════════════════════════════════════════════════════ */
 
 .pill {
   font-size: 11.5px;
   font-weight: 500;
-  padding: 2px 9px;
+  padding: 3px 10px;
   border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  color: var(--text-dim);
+  border: 1px solid var(--border-2);
+  color: var(--text-3);
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  background: var(--surface-2);
 }
 
 .pill.ok {
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  background: var(--accent-soft);
+  color: var(--live);
+  border-color: color-mix(in srgb, var(--live) 35%, transparent);
+  background: var(--live-dim);
 }
 
 .pill.warn {
   color: var(--warn);
-  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
-  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border-color: color-mix(in srgb, var(--warn) 32%, transparent);
+  background: var(--warn-dim);
 }
 
 .pill.danger {
   color: var(--danger);
-  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 32%, transparent);
+  background: var(--danger-dim);
 }
 
-/* ─────────── تنبيهات ─────────── */
+/* نقطة حيّة تنبض داخل الشارة */
+.pill.ok::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--live);
+  box-shadow: 0 0 0 0 var(--live-glow);
+  animation: pill-pulse 2.2s var(--ease-in-out) infinite;
+}
+
+@keyframes pill-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--live-glow); }
+  50% { box-shadow: 0 0 0 4px transparent; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   التنبيهات
+   ═══════════════════════════════════════════════════════════ */
 
 .alert {
+  position: relative;
   border-radius: var(--r);
-  padding: 14px 16px;
-  margin-bottom: 16px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
   font-size: 14px;
   border: 1px solid var(--border);
   background: var(--surface);
-  line-height: 1.65;
+  line-height: 1.7;
+  animation: alert-in 0.4s var(--ease);
 }
 
-.alert.warn {
-  border-color: color-mix(in srgb, var(--warn) 35%, transparent);
-  background: color-mix(in srgb, var(--warn) 8%, transparent);
+@keyframes alert-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
 }
 
-.alert.ok {
-  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  background: var(--accent-soft);
+/* شريط جانبي ملوّن */
+.alert::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--text-3);
 }
 
-.alert.danger {
-  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
-  background: color-mix(in srgb, var(--danger) 8%, transparent);
-}
+.alert.ok { border-color: color-mix(in srgb, var(--live) 25%, var(--border)); background: linear-gradient(90deg, var(--live-dim), var(--surface) 60%); }
+.alert.ok::before { background: var(--live); }
 
-/* ─────────── جداول ─────────── */
+.alert.warn { border-color: color-mix(in srgb, var(--warn) 25%, var(--border)); background: linear-gradient(90deg, var(--warn-dim), var(--surface) 60%); }
+.alert.warn::before { background: var(--warn); }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
+.alert.danger { border-color: color-mix(in srgb, var(--danger) 25%, var(--border)); background: linear-gradient(90deg, var(--danger-dim), var(--surface) 60%); }
+.alert.danger::before { background: var(--danger); }
 
-th,
-td {
-  text-align: right;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-}
+/* ═══════════════════════════════════════════════════════════
+   الجداول
+   ═══════════════════════════════════════════════════════════ */
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+
+th, td { text-align: right; padding: 12px 14px; border-bottom: 1px solid var(--border); }
 
 th {
-  color: var(--text-dim);
+  color: var(--text-3);
   font-weight: 500;
-  font-size: 12px;
+  font-size: 11.5px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
-tbody tr:last-child td {
-  border-bottom: none;
-}
+tbody tr { transition: background var(--t); }
+tbody tr:hover { background: var(--surface-2); }
+tbody tr:last-child td { border-bottom: none; }
 
-/* ─────────── تفاصيل قابلة للطي ─────────── */
+/* ═══════════════════════════════════════════════════════════
+   التفاصيل القابلة للطي
+   ═══════════════════════════════════════════════════════════ */
 
 details.card > summary {
   cursor: pointer;
@@ -527,89 +704,210 @@ details.card > summary {
   list-style: none;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
+  transition: color var(--t);
 }
 
-details.card > summary::-webkit-details-marker {
-  display: none;
-}
+details.card > summary::-webkit-details-marker { display: none; }
 
 details.card > summary::before {
-  content: "＋";
-  color: var(--accent);
-  font-weight: 700;
+  content: "";
   flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--border-2);
+  background:
+    linear-gradient(var(--live), var(--live)) center/8px 1.5px no-repeat,
+    linear-gradient(var(--live), var(--live)) center/1.5px 8px no-repeat,
+    var(--surface-2);
+  transition: transform 0.3s var(--ease), border-color var(--t);
 }
 
 details.card[open] > summary::before {
-  content: "－";
+  transform: rotate(135deg);
+  border-color: var(--live);
 }
 
-/* ─────────── محادثة ─────────── */
+details.card > summary:hover::before { border-color: var(--border-glow); }
+
+details.card[open] > summary { margin-bottom: 4px; }
+
+/* ═══════════════════════════════════════════════════════════
+   المحادثة
+   ═══════════════════════════════════════════════════════════ */
 
 .bubble {
-  padding: 10px 14px;
-  border-radius: 14px;
-  margin-bottom: 8px;
-  max-width: 78%;
+  padding: 11px 15px;
+  border-radius: 16px;
+  margin-bottom: 9px;
+  max-width: 76%;
   white-space: pre-wrap;
   font-size: 14.5px;
-  line-height: 1.65;
+  line-height: 1.7;
+  animation: bubble-in 0.35s var(--ease);
+}
+
+@keyframes bubble-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
 }
 
 .bubble.user {
-  background: var(--accent);
-  color: var(--accent-fg);
+  background: var(--live);
+  color: var(--on-live);
   margin-inline-start: auto;
-  border-end-end-radius: 4px;
+  border-end-end-radius: 5px;
+  font-weight: 500;
 }
 
 .bubble.agent {
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-end-start-radius: 4px;
+  border-end-start-radius: 5px;
 }
 
 .meta {
   font-size: 11.5px;
-  color: var(--text-faint);
+  color: var(--text-3);
   margin: -4px 0 14px;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
-/* ─────────── حالة فارغة ─────────── */
+/* مؤشر الكتابة */
+.typing {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  border-end-start-radius: 5px;
+}
+
+.typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--text-3);
+  animation: typing 1.3s var(--ease-in-out) infinite;
+}
+
+.typing i:nth-child(2) { animation-delay: 0.16s; }
+.typing i:nth-child(3) { animation-delay: 0.32s; }
+
+@keyframes typing {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-4px); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   الحالة الفارغة وقائمة التحقق
+   ═══════════════════════════════════════════════════════════ */
 
 .empty {
   text-align: center;
-  padding: 48px 20px;
-  color: var(--text-dim);
+  padding: 56px 22px;
+  color: var(--text-3);
 }
 
 .empty-icon {
-  font-size: 34px;
-  margin-bottom: 10px;
-  opacity: 0.55;
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-3);
+  margin-bottom: 14px;
 }
-
-/* ─────────── قائمة تحقق ─────────── */
 
 .check-item {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: flex-start;
-  padding: 9px 0;
+  padding: 11px 0;
   font-size: 14px;
   border-bottom: 1px solid var(--border);
 }
 
-.check-item:last-child {
-  border-bottom: none;
-}
+.check-item:last-child { border-bottom: none; }
 
 .check-mark {
   flex: none;
-  width: 18px;
-  text-align: center;
-  font-weight: 700;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--border-2);
+  font-size: 11px;
+  margin-top: 2px;
 }
+
+.check-mark.done {
+  color: var(--live);
+  border-color: color-mix(in srgb, var(--live) 40%, transparent);
+  background: var(--live-dim);
+}
+
+/* شريط تقدّم */
+.bar {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--live-2), var(--live));
+  box-shadow: 0 0 12px var(--live-glow);
+  transition: width 0.8s var(--ease);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   الحركات المشتركة
+   ═══════════════════════════════════════════════════════════ */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+}
+
+.reveal.in { opacity: 1; transform: none; }
+
+/* ═══════════════════════════════════════════════════════════
+   احترام تفضيل تقليل الحركة
+   ═══════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   شريط التمرير
+   ═══════════════════════════════════════════════════════════ */
+
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 999px;
+  border: 3px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--border-glow); }
+
+::selection { background: var(--live-dim); color: var(--text); }

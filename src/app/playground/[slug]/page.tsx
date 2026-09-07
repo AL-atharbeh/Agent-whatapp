@@ -19,7 +19,7 @@ export default async function Playground({
 
   return (
     <main>
-      <Link href="/" className="sub" style={{ color: "var(--muted)" }}>
+      <Link href="/" className="sub" style={{ color: "var(--text-3)" }}>
         ← كل العملاء
       </Link>
       <h1 style={{ marginTop: 12 }}>{tenant.name}</h1>

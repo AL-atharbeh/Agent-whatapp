@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "حذف البيانات — وكيل",
-  description: "كيف تطلب حذف بياناتك من منصة وكيل.",
+  title: "حذف البيانات — حاضر",
+  description: "كيف تطلب حذف بياناتك من منصة حاضر.",
 };
 
 export default function DataDeletionPage() {
@@ -15,7 +15,7 @@ export default function DataDeletionPage() {
       <div className="card">
         <p style={{ marginTop: 0 }}>
           لحذف محادثاتك وأي بيانات مرتبطة بك، أرسل بريداً إلى{" "}
-          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--accent)" }}>
+          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--live)" }}>
             bashar188yousef@gmail.com
           </a>{" "}
           يتضمّن:
@@ -59,7 +59,7 @@ export default function DataDeletionPage() {
       <div className="card" dir="ltr" style={{ textAlign: "left" }}>
         <p style={{ marginTop: 0 }}>
           <strong>End users:</strong> email{" "}
-          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--accent)" }}>
+          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--live)" }}>
             bashar188yousef@gmail.com
           </a>{" "}
           with the phone number or account you messaged from, the name of the business you

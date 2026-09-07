@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 import { ALL_CHANNELS, MODELS } from "@/lib/plans";
 import { deletePlan, savePlan, syncPlanToTenants } from "@/app/(billing)/plan-actions";
+import { Reveal, Counter } from "@/components/motion";
 
 export const dynamic = "force-dynamic";
 
@@ -193,7 +194,7 @@ export default async function PlansPage() {
   return (
     <main className="wide">
       <div className="row" style={{ marginBottom: 10 }}>
-        <Link href="/admin" style={{ color: "var(--text-dim)", fontSize: 13.5 }}>
+        <Link href="/admin" style={{ color: "var(--text-3)", fontSize: 13.5 }}>
           ← لوحة المنصة
         </Link>
       </div>
@@ -203,22 +204,22 @@ export default async function PlansPage() {
         عدّل الأسعار والحدود من هنا — التغيير فوري ويظهر للعملاء مباشرة.
       </p>
 
-      <div className="stats">
-        <div className="stat">
-          <div className="stat-value">{plans.length}</div>
-          <div className="stat-label">باقة</div>
-        </div>
-        <div className="stat">
-          <div className="stat-value">{totalSubs}</div>
-          <div className="stat-label">مشترك نشط</div>
-        </div>
-        <div className="stat">
-          <div className="stat-value" style={{ color: "var(--accent)" }}>
-            {totalRevenue}
+      <Reveal>
+        <div className="stats">
+          <div className="stat">
+            <div className="stat-value"><Counter value={plans.length} /></div>
+            <div className="stat-label">باقة</div>
           </div>
-          <div className="stat-label">دينار / شهر</div>
+          <div className="stat">
+            <div className="stat-value"><Counter value={totalSubs} /></div>
+            <div className="stat-label">مشترك نشط</div>
+          </div>
+          <div className="stat">
+            <div className="stat-value live"><Counter value={totalRevenue} /></div>
+            <div className="stat-label">دينار / شهر</div>
+          </div>
         </div>
-      </div>
+      </Reveal>
 
       <details className="card">
         <summary>إضافة باقة جديدة</summary>
