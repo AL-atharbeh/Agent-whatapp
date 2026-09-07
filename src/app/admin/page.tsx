@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { createTenant } from "./actions";
 import { BUSINESS_TYPES } from "./types";
+import { planOf, SUBSCRIPTION_LABEL } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,10 @@ export default async function AdminHome() {
   ]);
 
   const [allTenants, active, convos, leads, todayReplies] = totals;
-  const pending = tenants.filter((t) => t.status === "PAUSED");
+  const pending = tenants.filter((t) => t.requestedPlan);
+  const mrr = tenants
+    .filter((t) => t.subscription === "ACTIVE")
+    .reduce((sum, t) => sum + Number(t.monthlyPrice ?? 0), 0);
 
   return (
     <main className="wide">
@@ -67,12 +71,25 @@ export default async function AdminHome() {
           <div className="stat-value">{todayReplies}</div>
           <div className="stat-label">رد اليوم</div>
         </div>
+        <div className="stat">
+          <div className="stat-value" style={{ color: "var(--accent)" }}>
+            {mrr}
+          </div>
+          <div className="stat-label">دينار / شهر</div>
+        </div>
       </div>
 
       {pending.length > 0 && (
         <div className="alert warn">
-          <strong>{pending.length} متجر بانتظار التفعيل</strong> — سجّلوا بأنفسهم ولن يرد
-          وكيلهم حتى تفعّله من إعداداته بعد تأكيد الاشتراك.
+          <strong>{pending.length} طلب اشتراك بانتظارك</strong> — راجع كل متجر من تبويب
+          «الاشتراك» وفعّله بعد تأكيد الدفع.
+          <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {pending.map((t) => (
+              <Link className="btn" key={t.id} href={`/admin/${t.slug}/billing`}>
+                {t.name} — {planOf(t.requestedPlan)?.name}
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 
@@ -162,8 +179,22 @@ export default async function AdminHome() {
                       t.businessType}
                   </span>
                   {t._count.channels > 0 && (
-                    <span className="pill ok">{t._count.channels} قناة</span>
+                    <span className="pill">{t._count.channels} قناة</span>
                   )}
+                  {(() => {
+                    const sub = SUBSCRIPTION_LABEL[t.subscription];
+                    const plan = planOf(t.plan);
+                    if (t.subscription === "ACTIVE" && plan) {
+                      return (
+                        <span className="pill ok">
+                          {plan.name} · {Number(t.monthlyPrice ?? plan.monthlyPrice)} د
+                        </span>
+                      );
+                    }
+                    return sub?.cls ? (
+                      <span className={`pill ${sub.cls}`}>{sub.label}</span>
+                    ) : null;
+                  })()}
                 </div>
                 <div className="hint" style={{ margin: "6px 0 0" }}>
                   {t.users[0]?.email ?? "بلا حساب مرتبط"} · {t._count.products} منتج ·{" "}

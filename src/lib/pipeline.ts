@@ -1,4 +1,6 @@
+import { prisma } from "./db";
 import { decrypt } from "./crypto";
+import { planAllowsChannel } from "./plans";
 import { runAgentTurn } from "./agent/engine";
 import { sendMessage } from "./channels/meta";
 import type { InboundMessage } from "./channels/types";
@@ -45,6 +47,24 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
 
   const tenant = await loadTenantById(account.tenantId);
   if (!tenant || tenant.status !== "ACTIVE") return;
+
+  // 1ب) الاشتراك — الحدود المعلنة في الباقة تُطبَّق هنا فعلاً، لا في الواجهة فقط
+  if (tenant.subscription !== "ACTIVE") {
+    console.warn(`[pipeline] اشتراك غير نشط: ${tenant.slug} (${tenant.subscription})`);
+    return;
+  }
+  if (tenant.expiresAt && tenant.expiresAt < new Date()) {
+    console.warn(`[pipeline] اشتراك منتهٍ: ${tenant.slug}`);
+    await prisma.tenant.update({
+      where: { id: tenant.id },
+      data: { subscription: "EXPIRED", status: "PAUSED" },
+    });
+    return;
+  }
+  if (!planAllowsChannel(tenant.plan, msg.channel)) {
+    console.warn(`[pipeline] قناة ${msg.channel} خارج باقة ${tenant.plan} — ${tenant.slug}`);
+    return;
+  }
 
   const scope = tenantScope(tenant.id);
 

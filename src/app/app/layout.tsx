@@ -34,10 +34,24 @@ export default async function PortalLayout({ children }: { children: React.React
       </header>
 
       <main className="wide">
-        {tenant.status !== "ACTIVE" && (
+        {tenant.subscription !== "ACTIVE" && (
           <div className="alert warn">
-            <strong>متجرك قيد التفعيل.</strong> جهّز بياناتك وكتالوجك الآن — وسنفعّل الوكيل
-            على قنواتك بعد تأكيد الاشتراك. تقدر تجرّبه في «التجربة» قبل التفعيل.
+            {tenant.subscription === "REQUESTED" ? (
+              <>
+                <strong>طلبك قيد المراجعة ⏳</strong> — سنتواصل معك لتأكيد الدفع، ثم يبدأ
+                وكيلك بالرد على قنواتك. جهّز كتالوجك الآن حتى يكون جاهزاً لحظة التفعيل.
+              </>
+            ) : (
+              <>
+                <strong>متجرك بلا اشتراك بعد.</strong> جهّز بياناتك وكتالوجك، جرّب وكيلك
+                مجاناً من «تجربة الوكيل» — ولما ترضى، اختر باقتك.
+                <div style={{ marginTop: 10 }}>
+                  <Link className="btn" href="/app/subscription">
+                    شوف الباقات
+                  </Link>
+                </div>
+              </>
+            )}
           </div>
         )}
 

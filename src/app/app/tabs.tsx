@@ -12,6 +12,7 @@ const TABS = [
   { href: "/conversations", label: "المحادثات" },
   { href: "/leads", label: "العملاء المحتملون" },
   { href: "/try", label: "تجربة الوكيل" },
+  { href: "/subscription", label: "الاشتراك" },
 ];
 
 export default function PortalTabs() {

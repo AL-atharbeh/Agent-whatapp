@@ -52,6 +52,14 @@ enum TenantStatus {
   SUSPENDED
 }
 
+enum SubscriptionStatus {
+  NONE      // سجّل ولم يطلب باقة بعد
+  REQUESTED // اختار باقة وينتظر تفعيل مالك المنصة
+  ACTIVE    // مفعّل ويعمل
+  EXPIRED   // انتهت المدة
+  CANCELLED
+}
+
 model Tenant {
   id           String       @id @default(cuid())
   slug         String       @unique // يستخدم في رابط الويبهوك: /api/webhooks/meta/<slug>
@@ -62,6 +70,18 @@ model Tenant {
   locale   String @default("ar-JO") // لغة/لهجة الرد
   timezone String @default("Asia/Amman")
   currency String @default("JOD")
+
+  // ── الاشتراك ──
+  // الباقة تحدد الحدود المطبَّقة فعلياً (القنوات، سقف الردود، النموذج) —
+  // انظر src/lib/plans.ts. الطلب من العميل، والتفعيل من مالك المنصة.
+  plan               String?            // STARTER | GROWTH | BUSINESS
+  requestedPlan      String?            // ما اختاره العميل وينتظر تفعيله
+  subscription       SubscriptionStatus @default(NONE)
+  monthlyPrice       Decimal?           @db.Decimal(10, 2)
+  requestedAt        DateTime?
+  activatedAt        DateTime?
+  expiresAt          DateTime?
+  billingNote        String?            @db.Text // ملاحظة داخلية لمالك المنصة
 
   // ── إعدادات شخصية الوكيل ──
   agentName        String  @default("المساعد")
