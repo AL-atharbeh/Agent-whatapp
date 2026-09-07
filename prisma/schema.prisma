@@ -178,6 +178,9 @@ model ChannelAccount {
   // WHATSAPP فقط: معرّف حساب واتساب التجاري — يُستخدم لاشتراك التطبيق فيه
   wabaId String?
 
+  // آخر اشتراك ناجح للتطبيق في أصل القناة عند Meta
+  subscribedAt DateTime?
+
   // مشفّرة بـ AES-256-GCM قبل التخزين (src/lib/crypto.ts)
   accessTokenEnc String? @db.Text
   appSecretEnc   String? @db.Text

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { deleteChannel, saveChannel, subscribeWaba } from "../../actions";
+import { deleteChannel, saveChannel, subscribeChannel } from "../../actions";
 import { CHANNELS } from "../../types";
 
 export const dynamic = "force-dynamic";
@@ -151,25 +151,26 @@ export default async function ChannelsPage({
           <div style={{ marginTop: 16 }}>
             <ChannelForm slug={slug} acc={a} />
 
-            {a.channel === "WHATSAPP" && (
-              <div
-                style={{
-                  borderTop: "1px solid var(--border)",
-                  marginTop: 16,
-                  paddingTop: 16,
-                }}
-              >
-                <h3>ربط التطبيق بحساب واتساب التجاري</h3>
-                <p className="hint">
-                  ⚠️ خطوة إلزامية لا تفعلها واجهة Meta تلقائياً. بدونها يعمل الإرسال بينما
-                  <strong> لا تصل أي رسالة واردة إطلاقاً</strong>. نفّذها بعد حفظ Access
-                  Token.
-                </p>
-                <form action={subscribeWaba}>
-                  <input type="hidden" name="slug" value={slug} />
-                  <input type="hidden" name="id" value={a.id} />
+            <div
+              style={{
+                borderTop: "1px solid var(--border)",
+                marginTop: 16,
+                paddingTop: 16,
+              }}
+            >
+              <h3>اشتراك التطبيق في القناة</h3>
+              <p className="hint">
+                ⚠️ خطوة إلزامية لا تفعلها واجهة Meta تلقائياً ولا تنبّه إلى غيابها. بدونها
+                يعمل الإرسال بينما <strong>لا تصل أي رسالة واردة إطلاقاً</strong>. نفّذها
+                بعد حفظ Access Token.
+              </p>
+              <form action={subscribeChannel}>
+                <input type="hidden" name="slug" value={slug} />
+                <input type="hidden" name="id" value={a.id} />
+
+                {a.channel === "WHATSAPP" ? (
                   <label>
-                    <span>WhatsApp Business Account ID (من لوحة Meta)</span>
+                    <span>WhatsApp Business Account ID (غير رقم الهاتف)</span>
                     <input
                       type="text"
                       name="wabaId"
@@ -177,17 +178,26 @@ export default async function ChannelsPage({
                       placeholder="4140770986215477"
                     />
                   </label>
-                  <button type="submit">
-                    {a.wabaId ? "إعادة الاشتراك" : "اشترك الآن"}
-                  </button>
-                  {a.wabaId && (
-                    <span className="pill ok" style={{ marginInlineStart: 8 }}>
-                      مشترك
-                    </span>
-                  )}
-                </form>
-              </div>
-            )}
+                ) : (
+                  <p className="hint">
+                    الاشتراك يتم على الصفحة <code>{a.externalId}</code> في حقول{" "}
+                    <code>messages</code> و <code>messaging_postbacks</code>.
+                  </p>
+                )}
+
+                <button type="submit">
+                  {a.subscribedAt ? "إعادة الاشتراك" : "اشترك الآن"}
+                </button>
+                {a.subscribedAt && (
+                  <span className="pill ok" style={{ marginInlineStart: 8 }}>
+                    مشترك{" "}
+                    {new Intl.DateTimeFormat("ar-JO", { dateStyle: "short" }).format(
+                      a.subscribedAt,
+                    )}
+                  </span>
+                )}
+              </form>
+            </div>
 
             <form action={deleteChannel} style={{ marginTop: 16 }}>
               <input type="hidden" name="slug" value={slug} />

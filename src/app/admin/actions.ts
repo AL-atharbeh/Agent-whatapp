@@ -360,17 +360,19 @@ export async function saveChannel(formData: FormData) {
 }
 
 /**
- * يشترك تطبيقك في حساب واتساب التجاري للعميل.
+ * يشترك تطبيقك في أصل القناة عند Meta.
  *
  * ⚠️ خطوة لا تفعلها واجهة Meta تلقائياً ولا تنبّه إلى غيابها: بدونها يعمل
- * الإرسال بينما لا تصل أي رسالة واردة إطلاقاً. كلّفنا يوماً كاملاً عند أول
+ * الإرسال بينما لا تصل أي رسالة واردة إطلاقاً. كلّفتنا يوماً كاملاً عند أول
  * عميل — فصارت زراً هنا.
+ *
+ * الأصل يختلف بالقناة:
+ *   واتساب            ← WhatsApp Business Account ID (منفصل عن رقم الهاتف)
+ *   ماسنجر/انستقرام   ← معرّف الصفحة نفسه (هو externalId المخزّن)
  */
-export async function subscribeWaba(formData: FormData) {
+export async function subscribeChannel(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"))!;
-  const wabaId = s(formData.get("wabaId"));
-  if (!wabaId) throw new Error("أدخل WhatsApp Business Account ID أولاً");
 
   const tenant = await prisma.tenant.findUniqueOrThrow({
     where: { slug },
@@ -381,22 +383,37 @@ export async function subscribeWaba(formData: FormData) {
   });
   if (!acc.accessTokenEnc) throw new Error("احفظ Access Token أولاً");
 
+  let target: string;
+  if (acc.channel === "WHATSAPP") {
+    const wabaId = s(formData.get("wabaId"));
+    if (!wabaId) throw new Error("أدخل WhatsApp Business Account ID أولاً");
+    target = wabaId;
+    await prisma.channelAccount.update({ where: { id }, data: { wabaId } });
+  } else {
+    // ماسنجر وانستقرام: الاشتراك على الصفحة نفسها
+    target = acc.externalId;
+  }
+
   const token = decrypt(acc.accessTokenEnc);
   const version = process.env.META_GRAPH_VERSION ?? "v21.0";
 
+  // حقول الصفحة تُحدَّد صراحةً؛ واتساب يشترك في كل الحقول المفعّلة بالتطبيق
+  const params =
+    acc.channel === "WHATSAPP"
+      ? ""
+      : "?subscribed_fields=messages,messaging_postbacks,message_reactions";
+
   const res = await fetch(
-    `https://graph.facebook.com/${version}/${wabaId}/subscribed_apps`,
+    `https://graph.facebook.com/${version}/${target}/subscribed_apps${params}`,
     { method: "POST", headers: { Authorization: `Bearer ${token}` } },
   );
   const body = await res.json();
 
   if (!body.success) {
-    throw new Error(
-      `فشل الاشتراك: ${body.error?.message ?? JSON.stringify(body)}`,
-    );
+    throw new Error(`فشل الاشتراك: ${body.error?.message ?? JSON.stringify(body)}`);
   }
 
-  await prisma.channelAccount.update({ where: { id }, data: { wabaId } });
+  await prisma.channelAccount.update({ where: { id }, data: { subscribedAt: new Date() } });
   revalidatePath(`/admin/${slug}/channels`);
 }
 
