@@ -175,6 +175,9 @@ model ChannelAccount {
   // WHATSAPP: phone_number_id | MESSENGER: page_id | INSTAGRAM: ig_account_id
   externalId String
 
+  // WHATSAPP فقط: معرّف حساب واتساب التجاري — يُستخدم لاشتراك التطبيق فيه
+  wabaId String?
+
   // مشفّرة بـ AES-256-GCM قبل التخزين (src/lib/crypto.ts)
   accessTokenEnc String? @db.Text
   appSecretEnc   String? @db.Text

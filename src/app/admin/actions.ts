@@ -6,7 +6,7 @@ import type { Channel, DataSourceKind, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { tenantScope } from "@/lib/tenancy";
 import { normalizeArabic } from "@/lib/arabic";
-import { encrypt } from "@/lib/crypto";
+import { decrypt, encrypt } from "@/lib/crypto";
 
 /**
  * إجراءات لوحة التحكم.
@@ -356,6 +356,47 @@ export async function saveChannel(formData: FormData) {
   if (id) await prisma.channelAccount.update({ where: { id, tenantId: tenant.id }, data });
   else await prisma.channelAccount.create({ data });
 
+  revalidatePath(`/admin/${slug}/channels`);
+}
+
+/**
+ * يشترك تطبيقك في حساب واتساب التجاري للعميل.
+ *
+ * ⚠️ خطوة لا تفعلها واجهة Meta تلقائياً ولا تنبّه إلى غيابها: بدونها يعمل
+ * الإرسال بينما لا تصل أي رسالة واردة إطلاقاً. كلّفنا يوماً كاملاً عند أول
+ * عميل — فصارت زراً هنا.
+ */
+export async function subscribeWaba(formData: FormData) {
+  const slug = s(formData.get("slug"))!;
+  const id = s(formData.get("id"))!;
+  const wabaId = s(formData.get("wabaId"));
+  if (!wabaId) throw new Error("أدخل WhatsApp Business Account ID أولاً");
+
+  const tenant = await prisma.tenant.findUniqueOrThrow({
+    where: { slug },
+    select: { id: true },
+  });
+  const acc = await prisma.channelAccount.findFirstOrThrow({
+    where: { id, tenantId: tenant.id },
+  });
+  if (!acc.accessTokenEnc) throw new Error("احفظ Access Token أولاً");
+
+  const token = decrypt(acc.accessTokenEnc);
+  const version = process.env.META_GRAPH_VERSION ?? "v21.0";
+
+  const res = await fetch(
+    `https://graph.facebook.com/${version}/${wabaId}/subscribed_apps`,
+    { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+  );
+  const body = await res.json();
+
+  if (!body.success) {
+    throw new Error(
+      `فشل الاشتراك: ${body.error?.message ?? JSON.stringify(body)}`,
+    );
+  }
+
+  await prisma.channelAccount.update({ where: { id }, data: { wabaId } });
   revalidatePath(`/admin/${slug}/channels`);
 }
 

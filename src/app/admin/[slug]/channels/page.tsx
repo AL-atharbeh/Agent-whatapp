@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { deleteChannel, saveChannel } from "../../actions";
+import { deleteChannel, saveChannel, subscribeWaba } from "../../actions";
 import { CHANNELS } from "../../types";
 
 export const dynamic = "force-dynamic";
@@ -92,10 +92,34 @@ export default async function ChannelsPage({
   return (
     <>
       <div className="card">
-        <h3>رابط الويبهوك الخاص بهذا المتجر</h3>
-        <p className="hint">ضعه في لوحة Meta تحت Webhooks، واشترك في حقل messages.</p>
-        <textarea className="code" readOnly rows={2} value={`${base}/api/webhooks/meta/${slug}`} />
-        <p className="hint" style={{ marginTop: 8 }}>
+        <h3>رابط الويبهوك</h3>
+        <p className="hint">
+          اختر حسب مَن يملك تطبيق Meta. في الحالتين اشترك في حقل <code>messages</code> فقط.
+        </p>
+
+        <p style={{ fontSize: 14, marginBottom: 4 }}>
+          <strong>أ) العميل على تطبيق Meta الخاص بك</strong> — نموذج SaaS، الأسرع
+        </p>
+        <textarea className="code" readOnly rows={1} value={`${base}/api/webhooks/meta`} />
+        <p className="hint">
+          رابط واحد لكل عملائك. يُحدَّد العميل تلقائياً من رقم الهاتف الوارد. يحتاج{" "}
+          <code>META_APP_SECRET</code> و <code>META_VERIFY_TOKEN</code> في متغيّرات البيئة.
+        </p>
+
+        <p style={{ fontSize: 14, margin: "16px 0 4px" }}>
+          <strong>ب) العميل يملك تطبيق Meta خاصاً به</strong>
+        </p>
+        <textarea
+          className="code"
+          readOnly
+          rows={1}
+          value={`${base}/api/webhooks/meta/${slug}`}
+        />
+        <p className="hint">
+          يستخدم App Secret و Verify Token المحفوظين في هذه القناة تحديداً.
+        </p>
+
+        <p className="hint" style={{ marginTop: 12 }}>
           للتجربة محلياً تحتاج نفقاً عاماً (مثل ngrok) لأن Meta لا تصل إلى localhost.
         </p>
       </div>
@@ -126,7 +150,46 @@ export default async function ChannelsPage({
           </summary>
           <div style={{ marginTop: 16 }}>
             <ChannelForm slug={slug} acc={a} />
-            <form action={deleteChannel} style={{ marginTop: 8 }}>
+
+            {a.channel === "WHATSAPP" && (
+              <div
+                style={{
+                  borderTop: "1px solid var(--border)",
+                  marginTop: 16,
+                  paddingTop: 16,
+                }}
+              >
+                <h3>ربط التطبيق بحساب واتساب التجاري</h3>
+                <p className="hint">
+                  ⚠️ خطوة إلزامية لا تفعلها واجهة Meta تلقائياً. بدونها يعمل الإرسال بينما
+                  <strong> لا تصل أي رسالة واردة إطلاقاً</strong>. نفّذها بعد حفظ Access
+                  Token.
+                </p>
+                <form action={subscribeWaba}>
+                  <input type="hidden" name="slug" value={slug} />
+                  <input type="hidden" name="id" value={a.id} />
+                  <label>
+                    <span>WhatsApp Business Account ID (من لوحة Meta)</span>
+                    <input
+                      type="text"
+                      name="wabaId"
+                      defaultValue={a.wabaId ?? ""}
+                      placeholder="4140770986215477"
+                    />
+                  </label>
+                  <button type="submit">
+                    {a.wabaId ? "إعادة الاشتراك" : "اشترك الآن"}
+                  </button>
+                  {a.wabaId && (
+                    <span className="pill ok" style={{ marginInlineStart: 8 }}>
+                      مشترك
+                    </span>
+                  )}
+                </form>
+              </div>
+            )}
+
+            <form action={deleteChannel} style={{ marginTop: 16 }}>
               <input type="hidden" name="slug" value={slug} />
               <input type="hidden" name="id" value={a.id} />
               <button type="submit" className="danger">
