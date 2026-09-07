@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { createTenant } from "./actions";
 import { BUSINESS_TYPES } from "./types";
-import { planOf, SUBSCRIPTION_LABEL } from "@/lib/plans";
+import { listPlans, SUBSCRIPTION_LABEL } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +37,8 @@ export default async function AdminHome() {
     ]),
   ]);
 
+  const allPlans = await listPlans(true);
+  const planByTier = new Map(allPlans.map((p) => [p.tier, p]));
   const [allTenants, active, convos, leads, todayReplies] = totals;
   const pending = tenants.filter((t) => t.requestedPlan);
   const mrr = tenants
@@ -45,7 +47,12 @@ export default async function AdminHome() {
 
   return (
     <main className="wide">
-      <h1>لوحة المنصة</h1>
+      <div className="row" style={{ marginBottom: 4 }}>
+        <h1 style={{ margin: 0 }}>لوحة المنصة</h1>
+        <Link className="btn ghost" href="/admin/plans">
+          إدارة الباقات
+        </Link>
+      </div>
       <p className="sub">كل المتاجر المشتركة — بياناتها معزولة تماماً عن بعضها.</p>
 
       <div className="stats">
@@ -86,7 +93,7 @@ export default async function AdminHome() {
           <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
             {pending.map((t) => (
               <Link className="btn" key={t.id} href={`/admin/${t.slug}/billing`}>
-                {t.name} — {planOf(t.requestedPlan)?.name}
+                {t.name} — {planByTier.get(t.requestedPlan ?? '')?.name}
               </Link>
             ))}
           </div>
@@ -183,7 +190,7 @@ export default async function AdminHome() {
                   )}
                   {(() => {
                     const sub = SUBSCRIPTION_LABEL[t.subscription];
-                    const plan = planOf(t.plan);
+                    const plan = planByTier.get(t.plan ?? '');
                     if (t.subscription === "ACTIVE" && plan) {
                       return (
                         <span className="pill ok">

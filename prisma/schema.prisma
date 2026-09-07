@@ -52,6 +52,39 @@ enum TenantStatus {
   SUSPENDED
 }
 
+/**
+ * الباقات — يديرها مالك المنصة من اللوحة.
+ *
+ * كل حد هنا يُطبَّق فعلياً وقت التفعيل ووقت معالجة الرسائل، لا مجرد نص
+ * تسويقي: تجاوز سقف الردود يوقف الرد، وقناة خارج الباقة تُرفض قبل النموذج.
+ */
+model Plan {
+  id      String  @id @default(cuid())
+  tier    String  @unique // معرّف ثابت يُخزَّن في Tenant.plan
+  name    String
+  tagline String?
+
+  monthlyPrice Decimal @db.Decimal(10, 2)
+
+  channels         String[] // WHATSAPP | MESSENGER | INSTAGRAM | WEB
+  maxRepliesPerDay Int      @default(200)
+  maxProducts      Int      @default(500)
+
+  // إعدادات النموذج التي تُطبَّق على متاجر هذه الباقة
+  modelId String @default("claude-sonnet-5")
+  effort  String @default("low")
+
+  features  String[]
+  highlight Boolean @default(false)
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, sortOrder])
+}
+
 enum SubscriptionStatus {
   NONE      // سجّل ولم يطلب باقة بعد
   REQUESTED // اختار باقة وينتظر تفعيل مالك المنصة

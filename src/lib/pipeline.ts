@@ -61,7 +61,7 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
     });
     return;
   }
-  if (!planAllowsChannel(tenant.plan, msg.channel)) {
+  if (!(await planAllowsChannel(tenant.plan, msg.channel))) {
     console.warn(`[pipeline] قناة ${msg.channel} خارج باقة ${tenant.plan} — ${tenant.slug}`);
     return;
   }

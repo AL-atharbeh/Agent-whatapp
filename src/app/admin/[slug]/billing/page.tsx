@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { PLAN_LIST, planOf, SUBSCRIPTION_LABEL } from "@/lib/plans";
+import { listPlans, getPlan, SUBSCRIPTION_LABEL } from "@/lib/plans";
 import {
   activateSubscription,
   extendSubscription,
@@ -21,8 +21,11 @@ export default async function BillingPage({
   const t = await prisma.tenant.findUnique({ where: { slug } });
   if (!t) notFound();
 
-  const current = planOf(t.plan);
-  const requested = planOf(t.requestedPlan);
+  const [plans, current, requested] = await Promise.all([
+    listPlans(true),
+    getPlan(t.plan),
+    getPlan(t.requestedPlan),
+  ]);
   const st = SUBSCRIPTION_LABEL[t.subscription] ?? SUBSCRIPTION_LABEL.NONE;
 
   const daysLeft = t.expiresAt
@@ -78,7 +81,7 @@ export default async function BillingPage({
             <label>
               <span>الباقة</span>
               <select name="plan" defaultValue={t.requestedPlan ?? t.plan ?? "GROWTH"}>
-                {PLAN_LIST.map((p) => (
+                {plans.map((p) => (
                   <option key={p.tier} value={p.tier}>
                     {p.name} — {p.monthlyPrice} د · {p.maxRepliesPerDay} رد/يوم
                   </option>

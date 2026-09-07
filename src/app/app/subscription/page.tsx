@@ -1,5 +1,5 @@
 import { requireOwnTenant } from "@/lib/session";
-import { PLAN_LIST, planOf, SUBSCRIPTION_LABEL } from "@/lib/plans";
+import { listPlans, getPlan, SUBSCRIPTION_LABEL } from "@/lib/plans";
 import { requestPlan } from "@/app/(billing)/actions";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +15,11 @@ export default async function SubscriptionPage({
   const sp = await searchParams;
   const { tenant } = await requireOwnTenant();
 
-  const current = planOf(tenant.plan);
-  const requested = planOf(tenant.requestedPlan);
+  const [plans, current, requested] = await Promise.all([
+    listPlans(),
+    getPlan(tenant.plan),
+    getPlan(tenant.requestedPlan),
+  ]);
   const st = SUBSCRIPTION_LABEL[tenant.subscription] ?? SUBSCRIPTION_LABEL.NONE;
 
   return (
@@ -72,7 +75,7 @@ export default async function SubscriptionPage({
           gap: 14,
         }}
       >
-        {PLAN_LIST.map((p) => {
+        {plans.map((p) => {
           const isCurrent = tenant.plan === p.tier && tenant.subscription === "ACTIVE";
           const isRequested = tenant.requestedPlan === p.tier;
 

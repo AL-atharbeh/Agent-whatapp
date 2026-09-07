@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { authorizeTenant, requireAdmin, requireOwnTenant } from "@/lib/session";
-import { PLANS, planOf, type PlanTier } from "@/lib/plans";
+import { getPlan } from "@/lib/plans";
 
 const s = (v: FormDataEntryValue | null) => v?.toString().trim() || null;
 
@@ -19,8 +19,9 @@ const s = (v: FormDataEntryValue | null) => v?.toString().trim() || null;
 export async function requestPlan(formData: FormData) {
   const { tenant } = await requireOwnTenant();
 
-  const tier = s(formData.get("plan")) as PlanTier | null;
-  if (!tier || !(tier in PLANS)) throw new Error("باقة غير معروفة");
+  const tier = s(formData.get("plan"));
+  const plan = tier ? await getPlan(tier) : null;
+  if (!plan || !plan.active) throw new Error("باقة غير متاحة");
 
   await prisma.tenant.update({
     where: { id: tenant.id },
@@ -48,8 +49,8 @@ export async function activateSubscription(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const tenantId = await authorizeTenant(slug);
 
-  const tier = (s(formData.get("plan")) ?? "") as PlanTier;
-  const plan = planOf(tier);
+  const tier = s(formData.get("plan"));
+  const plan = tier ? await getPlan(tier) : null;
   if (!plan) throw new Error("اختر باقة صالحة");
 
   const months = Number(s(formData.get("months")) ?? "1") || 1;
