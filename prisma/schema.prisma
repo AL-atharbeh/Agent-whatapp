@@ -17,6 +17,32 @@ datasource db {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  المستخدمون
+// ═══════════════════════════════════════════════════════════
+
+enum UserRole {
+  PLATFORM_ADMIN // مالك المنصة — يرى كل العملاء ويدير القنوات
+  TENANT_OWNER   // صاحب المتجر — يرى متجره فقط
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  role         UserRole @default(TENANT_OWNER)
+
+  // فارغ لمالك المنصة؛ إجباري فعلياً لصاحب المتجر — العزل يعتمد عليه
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+// ═══════════════════════════════════════════════════════════
 //  العميل (البزنس المشترك) — جذر العزل
 // ═══════════════════════════════════════════════════════════
 
@@ -53,6 +79,7 @@ model Tenant {
   channels      ChannelAccount[]
   conversations Conversation[]
   leads         Lead[]
+  users         User[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -5,6 +5,12 @@ import Tabs from "./tabs";
 
 export const dynamic = "force-dynamic";
 
+const STATUS: Record<string, { label: string; cls: string }> = {
+  ACTIVE: { label: "نشط", cls: "ok" },
+  PAUSED: { label: "بانتظار التفعيل", cls: "warn" },
+  SUSPENDED: { label: "معلّق", cls: "danger" },
+};
+
 export default async function TenantLayout({
   children,
   params,
@@ -19,24 +25,24 @@ export default async function TenantLayout({
   });
   if (!tenant) notFound();
 
+  const st = STATUS[tenant.status] ?? STATUS.PAUSED;
+
   return (
     <main className="wide">
-      <div className="row" style={{ marginBottom: 4 }}>
-        <Link href="/admin" style={{ color: "var(--muted)", fontSize: 14 }}>
+      <div className="row" style={{ marginBottom: 10 }}>
+        <Link href="/admin" style={{ color: "var(--text-dim)", fontSize: 13.5 }}>
           ← كل المتاجر
         </Link>
-        <Link className="btn" href={`/playground/${tenant.slug}`}>
+        <Link className="btn ghost" href={`/playground/${tenant.slug}`}>
           جرّب الوكيل
         </Link>
       </div>
 
-      <h1 style={{ marginTop: 12 }}>{tenant.name}</h1>
-      <p className="sub">
-        الوكيل: {tenant.agentName} ·{" "}
-        <span className={`pill ${tenant.status === "ACTIVE" ? "ok" : "warn"}`}>
-          {tenant.status === "ACTIVE" ? "نشط" : "متوقف"}
-        </span>
-      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <h1 style={{ margin: 0 }}>{tenant.name}</h1>
+        <span className={`pill ${st.cls}`}>{st.label}</span>
+      </div>
+      <p className="sub">الوكيل: {tenant.agentName}</p>
 
       <Tabs slug={tenant.slug} />
       {children}

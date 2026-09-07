@@ -10,7 +10,8 @@
     "db:studio": "prisma studio",
     "seed": "tsx scripts/seed.ts",
     "chat": "tsx scripts/simulate.ts",
-    "verify": "tsx scripts/verify-isolation.ts"
+    "verify": "tsx scripts/verify-isolation.ts",
+    "admin": "tsx --env-file=.env scripts/create-admin.ts"
   },
   "prisma": {
     "seed": "tsx scripts/seed.ts"

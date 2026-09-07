@@ -5,14 +5,18 @@ import { redirect } from "next/navigation";
 import type { Channel, DataSourceKind, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { tenantScope } from "@/lib/tenancy";
+import { authorizeTenant, getSession, requireAdmin } from "@/lib/session";
 import { normalizeArabic } from "@/lib/arabic";
 import { decrypt, encrypt } from "@/lib/crypto";
 
 /**
- * إجراءات لوحة التحكم.
+ * إجراءات إدارة المتاجر — يستخدمها مالك المنصة وأصحاب المتاجر معاً.
  *
- * ⚠️ هذه المسارات تعمل عبر العملاء كلهم بطبيعتها (لوحة مالك المنصة).
- * قبل أي استخدام حقيقي يجب إضافة مصادقة وصلاحيات فوقها — انظر README § الحدود.
+ * ⚠️ الأمان هنا لا يعتمد على middleware: server actions تُستدعى مباشرة عبر
+ * HTTP ولا تمر بكل فحوصه. لذلك كل إجراء يمر بـ authorizeTenant الذي يتحقّق
+ * من الجلسة الموقّعة — صاحب المتجر لا يعدّل إلا متجره مهما زوّر الحقول.
+ *
+ * الإجراءات الحسّاسة (إنشاء/حذف متجر، القنوات، التفعيل) محصورة بـ requireAdmin.
  */
 
 const s = (v: FormDataEntryValue | null) => {
@@ -41,6 +45,8 @@ function parseJson(v: FormDataEntryValue | null): Prisma.InputJsonValue | undefi
 // ═══════════════════════════════════════════════════════════
 
 export async function createTenant(formData: FormData) {
+  await requireAdmin();
+
   const slug = s(formData.get("slug"));
   const name = s(formData.get("name"));
   if (!slug || !name) throw new Error("الاسم والمعرّف مطلوبان");
@@ -76,9 +82,12 @@ export async function createTenant(formData: FormData) {
 
 export async function updateTenant(formData: FormData) {
   const slug = s(formData.get("slug"))!;
+  const tenantId = await authorizeTenant(slug);
+  const session = await getSession();
+  const isAdmin = session?.role === "PLATFORM_ADMIN";
 
   await prisma.tenant.update({
-    where: { slug },
+    where: { id: tenantId },
     data: {
       name: s(formData.get("name")) ?? undefined,
       businessType: s(formData.get("businessType")) ?? undefined,
@@ -87,27 +96,35 @@ export async function updateTenant(formData: FormData) {
       currency: s(formData.get("currency")) ?? undefined,
       locale: s(formData.get("locale")) ?? undefined,
       timezone: s(formData.get("timezone")) ?? undefined,
-      modelId: s(formData.get("modelId")) ?? undefined,
-      effort: s(formData.get("effort")) ?? undefined,
       customPolicy: s(formData.get("customPolicy")),
-      maxRepliesPerDay: n(formData.get("maxRepliesPerDay")) ?? undefined,
       handoffKeywords: (s(formData.get("handoffKeywords")) ?? "")
         .split(/[,،\n]/)
         .map((k) => k.trim())
         .filter(Boolean),
-      status: (s(formData.get("status")) ?? "ACTIVE") as "ACTIVE" | "PAUSED" | "SUSPENDED",
+
+      // إعدادات التكلفة والتفعيل بيد مالك المنصة وحده: صاحب المتجر لا يرفع
+      // سقف الإنفاق ولا يفعّل اشتراكه بنفسه.
+      ...(isAdmin
+        ? {
+            modelId: s(formData.get("modelId")) ?? undefined,
+            effort: s(formData.get("effort")) ?? undefined,
+            maxRepliesPerDay: n(formData.get("maxRepliesPerDay")) ?? undefined,
+            status: (s(formData.get("status")) ?? "ACTIVE") as
+              | "ACTIVE"
+              | "PAUSED"
+              | "SUSPENDED",
+          }
+        : {}),
     },
   });
 
   revalidatePath(`/admin/${slug}`);
+  revalidatePath("/app");
 }
 
 export async function updateProfile(formData: FormData) {
   const slug = s(formData.get("slug"))!;
-  const tenant = await prisma.tenant.findUniqueOrThrow({
-    where: { slug },
-    select: { id: true },
-  });
+  const tenantId = await authorizeTenant(slug);
 
   const data = {
     about: s(formData.get("about")),
@@ -122,8 +139,8 @@ export async function updateProfile(formData: FormData) {
   };
 
   await prisma.businessProfile.upsert({
-    where: { tenantId: tenant.id },
-    create: { tenantId: tenant.id, ...data },
+    where: { tenantId },
+    create: { tenantId, ...data },
     update: data,
   });
 
@@ -131,6 +148,7 @@ export async function updateProfile(formData: FormData) {
 }
 
 export async function deleteTenant(formData: FormData) {
+  await requireAdmin();
   const slug = s(formData.get("slug"))!;
   await prisma.tenant.delete({ where: { slug } });
   revalidatePath("/admin");
@@ -144,10 +162,7 @@ export async function deleteTenant(formData: FormData) {
 export async function saveProduct(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"));
-  const tenant = await prisma.tenant.findUniqueOrThrow({
-    where: { slug },
-    select: { id: true },
-  });
+  const tenantId = await authorizeTenant(slug);
 
   const name = s(formData.get("name"));
   if (!name) throw new Error("اسم المنتج مطلوب");
@@ -157,7 +172,7 @@ export async function saveProduct(formData: FormData) {
   const sku = s(formData.get("sku"));
 
   const data = {
-    tenantId: tenant.id,
+    tenantId,
     sku,
     name,
     description,
@@ -175,7 +190,7 @@ export async function saveProduct(formData: FormData) {
 
   if (id) {
     // نتحقّق أن المنتج يخصّ هذا العميل قبل التعديل
-    await prisma.product.update({ where: { id, tenantId: tenant.id }, data });
+    await prisma.product.update({ where: { id, tenantId }, data });
   } else {
     await prisma.product.create({ data });
   }
@@ -193,10 +208,7 @@ export async function bulkImportProducts(formData: FormData) {
   const raw = s(formData.get("bulk"));
   if (!raw) throw new Error("الصق قائمة أولاً");
 
-  const tenant = await prisma.tenant.findUniqueOrThrow({
-    where: { slug },
-    select: { id: true },
-  });
+  const tenantId = await authorizeTenant(slug);
 
   const rows = raw
     .split("\n")
@@ -212,7 +224,7 @@ export async function bulkImportProducts(formData: FormData) {
 
   await prisma.product.createMany({
     data: rows.map((r) => ({
-      tenantId: tenant.id,
+      tenantId,
       name: r.name,
       category: r.category || null,
       price: r.price && Number.isFinite(Number(r.price)) ? Number(r.price) : null,
@@ -227,11 +239,8 @@ export async function bulkImportProducts(formData: FormData) {
 export async function deleteProduct(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"))!;
-  const tenant = await prisma.tenant.findUniqueOrThrow({
-    where: { slug },
-    select: { id: true },
-  });
-  await prisma.product.delete({ where: { id, tenantId: tenant.id } });
+  const tenantId = await authorizeTenant(slug);
+  await prisma.product.delete({ where: { id, tenantId } });
   revalidatePath(`/admin/${slug}/products`);
 }
 
@@ -242,24 +251,21 @@ export async function deleteProduct(formData: FormData) {
 export async function saveFaq(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"));
-  const tenant = await prisma.tenant.findUniqueOrThrow({
-    where: { slug },
-    select: { id: true },
-  });
+  const tenantId = await authorizeTenant(slug);
 
   const question = s(formData.get("question"));
   const answer = s(formData.get("answer"));
   if (!question || !answer) throw new Error("السؤال والجواب مطلوبان");
 
   const data = {
-    tenantId: tenant.id,
+    tenantId,
     question,
     answer,
     priority: n(formData.get("priority")) ?? 0,
     active: formData.get("active") === "on",
   };
 
-  if (id) await prisma.faq.update({ where: { id, tenantId: tenant.id }, data });
+  if (id) await prisma.faq.update({ where: { id, tenantId }, data });
   else await prisma.faq.create({ data });
 
   revalidatePath(`/admin/${slug}/faqs`);
@@ -268,11 +274,8 @@ export async function saveFaq(formData: FormData) {
 export async function deleteFaq(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"))!;
-  const tenant = await prisma.tenant.findUniqueOrThrow({
-    where: { slug },
-    select: { id: true },
-  });
-  await prisma.faq.delete({ where: { id, tenantId: tenant.id } });
+  const tenantId = await authorizeTenant(slug);
+  await prisma.faq.delete({ where: { id, tenantId } });
   revalidatePath(`/admin/${slug}/faqs`);
 }
 
@@ -283,10 +286,7 @@ export async function deleteFaq(formData: FormData) {
 export async function saveDataSource(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"));
-  const tenant = await prisma.tenant.findUniqueOrThrow({
-    where: { slug },
-    select: { id: true },
-  });
+  const tenantId = await authorizeTenant(slug);
 
   const key = s(formData.get("key"));
   const label = s(formData.get("label"));
@@ -295,7 +295,7 @@ export async function saveDataSource(formData: FormData) {
   const value = parseJson(formData.get("value"));
 
   const data = {
-    tenantId: tenant.id,
+    tenantId,
     key,
     label,
     kind: (s(formData.get("kind")) ?? "MANUAL") as DataSourceKind,
@@ -306,7 +306,7 @@ export async function saveDataSource(formData: FormData) {
     ...(value !== undefined ? { value, valueAt: new Date() } : {}),
   };
 
-  if (id) await prisma.dataSource.update({ where: { id, tenantId: tenant.id }, data });
+  if (id) await prisma.dataSource.update({ where: { id, tenantId }, data });
   else await prisma.dataSource.create({ data });
 
   revalidatePath(`/admin/${slug}/data`);
@@ -315,11 +315,8 @@ export async function saveDataSource(formData: FormData) {
 export async function deleteDataSource(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"))!;
-  const tenant = await prisma.tenant.findUniqueOrThrow({
-    where: { slug },
-    select: { id: true },
-  });
-  await prisma.dataSource.delete({ where: { id, tenantId: tenant.id } });
+  const tenantId = await authorizeTenant(slug);
+  await prisma.dataSource.delete({ where: { id, tenantId } });
   revalidatePath(`/admin/${slug}/data`);
 }
 
@@ -328,12 +325,10 @@ export async function deleteDataSource(formData: FormData) {
 // ═══════════════════════════════════════════════════════════
 
 export async function saveChannel(formData: FormData) {
+  await requireAdmin(); // مفاتيح Meta بيد مالك المنصة وحده
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"));
-  const tenant = await prisma.tenant.findUniqueOrThrow({
-    where: { slug },
-    select: { id: true },
-  });
+  const tenantId = await authorizeTenant(slug);
 
   const externalId = s(formData.get("externalId"));
   if (!externalId) throw new Error("معرّف الحساب مطلوب");
@@ -342,7 +337,7 @@ export async function saveChannel(formData: FormData) {
   const secret = s(formData.get("appSecret"));
 
   const data = {
-    tenantId: tenant.id,
+    tenantId,
     channel: (s(formData.get("channel")) ?? "WHATSAPP") as Channel,
     externalId,
     displayName: s(formData.get("displayName")),
@@ -353,7 +348,7 @@ export async function saveChannel(formData: FormData) {
     ...(secret ? { appSecretEnc: encrypt(secret) } : {}),
   };
 
-  if (id) await prisma.channelAccount.update({ where: { id, tenantId: tenant.id }, data });
+  if (id) await prisma.channelAccount.update({ where: { id, tenantId }, data });
   else await prisma.channelAccount.create({ data });
 
   revalidatePath(`/admin/${slug}/channels`);
@@ -371,15 +366,13 @@ export async function saveChannel(formData: FormData) {
  *   ماسنجر/انستقرام   ← معرّف الصفحة نفسه (هو externalId المخزّن)
  */
 export async function subscribeChannel(formData: FormData) {
+  await requireAdmin(); // مفاتيح Meta بيد مالك المنصة وحده
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"))!;
 
-  const tenant = await prisma.tenant.findUniqueOrThrow({
-    where: { slug },
-    select: { id: true },
-  });
+  const tenantId = await authorizeTenant(slug);
   const acc = await prisma.channelAccount.findFirstOrThrow({
-    where: { id, tenantId: tenant.id },
+    where: { id, tenantId },
   });
   if (!acc.accessTokenEnc) throw new Error("احفظ Access Token أولاً");
 
@@ -418,13 +411,11 @@ export async function subscribeChannel(formData: FormData) {
 }
 
 export async function deleteChannel(formData: FormData) {
+  await requireAdmin(); // مفاتيح Meta بيد مالك المنصة وحده
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"))!;
-  const tenant = await prisma.tenant.findUniqueOrThrow({
-    where: { slug },
-    select: { id: true },
-  });
-  await prisma.channelAccount.delete({ where: { id, tenantId: tenant.id } });
+  const tenantId = await authorizeTenant(slug);
+  await prisma.channelAccount.delete({ where: { id, tenantId } });
   revalidatePath(`/admin/${slug}/channels`);
 }
 
@@ -436,12 +427,9 @@ export async function deleteChannel(formData: FormData) {
 export async function resumeBot(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"))!;
-  const tenant = await prisma.tenant.findUniqueOrThrow({
-    where: { slug },
-    select: { id: true },
-  });
+  const tenantId = await authorizeTenant(slug);
   await prisma.conversation.update({
-    where: { id, tenantId: tenant.id },
+    where: { id, tenantId },
     data: { status: "BOT", handoffReason: null, handoffAt: null },
   });
   revalidatePath(`/admin/${slug}/conversations`);
@@ -451,10 +439,7 @@ export async function resumeBot(formData: FormData) {
 export async function forceHandoff(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"))!;
-  const tenant = await prisma.tenant.findUniqueOrThrow({
-    where: { slug },
-    select: { id: true },
-  });
-  await tenantScope(tenant.id).handoff(id, "تحويل يدوي من اللوحة");
+  const tenantId = await authorizeTenant(slug);
+  await tenantScope(tenantId).handoff(id, "تحويل يدوي من اللوحة");
   revalidatePath(`/admin/${slug}/conversations`);
 }

@@ -7,7 +7,14 @@ import { prisma } from "@/lib/db";
 
 type Check = { label: string; ok: boolean; hint: string; critical: boolean };
 
-export default async function Readiness({ slug }: { slug: string }) {
+export default async function Readiness({
+  slug,
+  hideChannels = false,
+}: {
+  slug: string;
+  /** بوابة العميل تخفي بنود القنوات — إعدادها مسؤولية مالك المنصة. */
+  hideChannels?: boolean;
+}) {
   const t = await prisma.tenant.findUnique({
     where: { slug },
     include: {
@@ -78,15 +85,21 @@ export default async function Readiness({ slug }: { slug: string }) {
     },
   ];
 
-  const done = checks.filter((c) => c.ok).length;
-  const blockers = checks.filter((c) => c.critical && !c.ok);
+  const visible = hideChannels
+    ? checks.filter(
+        (c) => !c.label.includes("قناة") && !c.label.includes("ويبهوك") && !c.label.includes("الاشتراك"),
+      )
+    : checks;
+
+  const done = visible.filter((c) => c.ok).length;
+  const blockers = visible.filter((c) => c.critical && !c.ok);
 
   return (
     <div className="card">
       <div className="row">
         <h3 style={{ margin: 0 }}>جاهزية الإطلاق</h3>
         <span className={`pill ${blockers.length === 0 ? "ok" : "warn"}`}>
-          {done} / {checks.length}
+          {done} / {visible.length}
           {blockers.length > 0 && ` · ${blockers.length} مانع`}
         </span>
       </div>
@@ -97,15 +110,28 @@ export default async function Readiness({ slug }: { slug: string }) {
           : "العناصر المعلّمة بـ (ضروري) تمنع التشغيل الحقيقي."}
       </p>
 
-      <div style={{ marginTop: 12 }}>
-        {checks.map((c) => (
-          <div key={c.label} style={{ marginBottom: 10, fontSize: 14 }}>
-            <span style={{ color: c.ok ? "var(--accent)" : "var(--muted)" }}>
+      <div style={{ marginTop: 14 }}>
+        {visible.map((c) => (
+          <div className="check-item" key={c.label}>
+            <span
+              className="check-mark"
+              style={{ color: c.ok ? "var(--accent)" : "var(--text-faint)" }}
+            >
               {c.ok ? "✓" : "○"}
-            </span>{" "}
-            {c.label}
-            {c.critical && !c.ok && <span className="pill warn"> ضروري</span>}
-            {!c.ok && <div className="hint" style={{ margin: "2px 20px 0" }}>{c.hint}</div>}
+            </span>
+            <div style={{ flex: 1 }}>
+              {c.label}
+              {c.critical && !c.ok && (
+                <span className="pill warn" style={{ marginInlineStart: 8 }}>
+                  ضروري
+                </span>
+              )}
+              {!c.ok && (
+                <div className="hint" style={{ margin: "2px 0 0" }}>
+                  {c.hint}
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>
