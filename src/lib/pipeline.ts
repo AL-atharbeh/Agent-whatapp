@@ -175,7 +175,7 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
       await scope.handoff(convo.id, result.handoff.reason);
     }
 
-    await deliver(tenant.id, msg, result.reply);
+    await deliver(tenant.id, msg, result.reply, speak);
   });
 }
 
@@ -213,11 +213,16 @@ async function transcribeInbound(
   return out.value;
 }
 
+/**
+ * `speak` بلا قيمة افتراضية عمداً: نسيانه في أحد مواضع النداء يجعل الرد نصاً
+ * بصمت — وهو ما حدث فعلاً — والسقوط الآمن للنص يُخفي الخطأ بدل أن يُظهره.
+ * جعله إلزامياً ينقل الكشف من الإنتاج إلى المترجم.
+ */
 async function deliver(
   tenantId: string,
   msg: InboundMessage,
   text: string,
-  speak = false,
+  speak: boolean,
 ) {
   if (msg.channel === "WEB") return; // واجهة الويب تقرأ الرد من الاستجابة مباشرة
 
