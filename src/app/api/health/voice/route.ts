@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { synthesize } from "@/lib/speech";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
  * لا ينادي Groq ولا يكشف أي مفتاح: يفحص أن مرمّز mp3 انحزم فعلاً مع الدالة
  * وأنه يرمّز، وهو أرجح المشتبهين لأن استيراده ديناميكي.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const checks: Record<string, unknown> = {
     runtime: process.env.NEXT_RUNTIME ?? "nodejs",
     groq_key: Boolean(process.env.GROQ_API_KEY),
@@ -37,8 +38,20 @@ export async function GET() {
     };
   }
 
+  // ?tts=1 يشغّل توليداً حقيقياً — خلف علم لأن له كلفة وزمناً، ولأن الفحص
+  // الأول (بلا كلفة) يكفي في معظم الحالات.
+  if (new URL(req.url).searchParams.get("tts") === "1") {
+    const t0 = Date.now();
+    const v = await synthesize({ text: "تجربة." });
+    checks.tts = v.ok
+      ? { ok: true, bytes: v.value.audio.byteLength, mime: v.value.mimeType, ms: Date.now() - t0 }
+      : { ok: false, error: v.error, ms: Date.now() - t0 };
+  }
+
   const ok = Boolean(
-    checks.groq_key && (checks.mp3_encoder as { ok?: boolean })?.ok,
+    checks.groq_key &&
+      (checks.mp3_encoder as { ok?: boolean })?.ok &&
+      (checks.tts === undefined || (checks.tts as { ok?: boolean }).ok),
   );
 
   return NextResponse.json(
