@@ -1,6 +1,7 @@
 import type { Channel, MessageRole } from "@prisma/client";
 import type { TenantContext, TenantScope } from "../tenancy";
 import { buildSystemPrompt } from "./prompt";
+import { VOICE_STYLE } from "./voice-style";
 import { buildTools, type RunState } from "./tools";
 import { anthropicProvider } from "./providers/anthropic";
 import { groqProvider } from "./providers/groq";
@@ -76,7 +77,12 @@ export async function runAgentTurn(args: {
     // نموذج العميل من قاعدة البيانات؛ مزوّد Groq يتجاهله ويقرأ GROQ_MODEL
     model: tenant.modelId,
     effort: tenant.effort,
-    system: buildSystemPrompt(tenant),
+    // طبقة الأسلوب المنطوق تُضاف فوق التعليمات ولا تستبدلها: المعرفة والعزل
+    // والأدوات تبقى واحدة عبر كل القنوات، والمتغيّر هو شكل الرد فقط.
+    system:
+      channel === "VOICE"
+        ? buildSystemPrompt(tenant) + VOICE_STYLE
+        : buildSystemPrompt(tenant),
     volatileContext: `الوقت الآن: ${now}`,
     history: cleanHistory,
     userMessage,

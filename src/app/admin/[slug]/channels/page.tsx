@@ -1,6 +1,12 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { deleteChannel, saveChannel, subscribeChannel } from "../../actions";
+import {
+  deleteChannel,
+  revokeVoiceToken,
+  rotateVoiceToken,
+  saveChannel,
+  subscribeChannel,
+} from "../../actions";
 import { CHANNELS } from "../../types";
 
 export const dynamic = "force-dynamic";
@@ -83,7 +89,10 @@ export default async function ChannelsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const tenant = await prisma.tenant.findUnique({ where: { slug }, select: { id: true } });
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug },
+    select: { id: true, voiceToken: true },
+  });
   if (!tenant) notFound();
 
   const accounts = await prisma.channelAccount.findMany({ where: { tenantId: tenant.id } });
@@ -91,6 +100,63 @@ export default async function ChannelsPage({
 
   return (
     <>
+      {/* ── المكالمات ── */}
+      <div className="card">
+        <h3>المكالمات الصوتية</h3>
+        <p className="hint">
+          وكيلك معروض هنا بصيغة OpenAI، فتقدر أي منصة مكالمات تشغّله كـ «نموذج
+          مخصّص» — المنصة تتولّى الصوت والمقاطعة، والوكيل يتولّى المعرفة والأدوات.
+        </p>
+
+        <label style={{ marginTop: 14 }}>
+          <span>عنوان النموذج (Custom LLM URL)</span>
+        </label>
+        <textarea className="code" readOnly rows={1} value={`${base}/api/voice/${slug}`} />
+        <p className="hint">
+          بعض المنصات تطلب العنوان كاملاً بـ <code>/chat/completions</code> — أضفها لو
+          طلبتها.
+        </p>
+
+        <label style={{ marginTop: 14 }}>
+          <span>السرّ (API Key)</span>
+        </label>
+        {tenant.voiceToken ? (
+          <>
+            <textarea className="code" readOnly rows={1} value={tenant.voiceToken} />
+            <p className="hint">
+              انسخه الآن إلى منصة المكالمات. تبديله يوقف أي منصة ما زالت تستعمل
+              القديم — وهذا المقصود عند تسرّبه.
+            </p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+              <form action={rotateVoiceToken}>
+                <input type="hidden" name="slug" value={slug} />
+                <button type="submit" className="ghost">بدّل السرّ</button>
+              </form>
+              <form action={revokeVoiceToken}>
+                <input type="hidden" name="slug" value={slug} />
+                <button type="submit" className="danger">أوقف المكالمات</button>
+              </form>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="hint" style={{ margin: "0 0 12px" }}>
+              لا يوجد سرّ بعد — المكالمات معطّلة. النقطة عامة بالضرورة لأن منصة
+              خارجية تناديها، فبدون سرّ يقدر أي أحد يشغّل وكيلك ويصرف رصيدك.
+            </p>
+            <form action={rotateVoiceToken}>
+              <input type="hidden" name="slug" value={slug} />
+              <button type="submit">فعّل المكالمات وولّد سرّاً</button>
+            </form>
+          </>
+        )}
+
+        <p className="hint" style={{ marginTop: 14 }}>
+          تحتاج أيضاً <code>المكالمات</code> ضمن قنوات باقة هذا المتجر، وإلا رُفض
+          النداء.
+        </p>
+      </div>
+
       <div className="card">
         <h3>رابط الويبهوك</h3>
         <p className="hint">

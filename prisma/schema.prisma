@@ -131,6 +131,12 @@ model Tenant {
    */
   voiceReplies Boolean @default(false)
 
+  /**
+   * سرّ يصادق منصة المكالمات على نقطة الوكيل الصوتية.
+   * بدونه يقدر أي أحد يشغّل وكيلك ويصرف رصيدك — فالنقطة عامة بالضرورة.
+   */
+  voiceToken String? @unique
+
   profile       BusinessProfile?
   products      Product[]
   faqs          Faq[]
@@ -249,6 +255,7 @@ enum Channel {
   MESSENGER
   INSTAGRAM
   WEB
+  VOICE // مكالمة صوتية عبر منصة مكالمات خارجية
 }
 
 model ChannelAccount {

@@ -81,6 +81,7 @@ export const ALL_CHANNELS: { value: Channel; label: string }[] = [
   { value: "MESSENGER", label: "ماسنجر" },
   { value: "INSTAGRAM", label: "انستقرام" },
   { value: "WEB", label: "التجربة (الويب)" },
+  { value: "VOICE", label: "المكالمات" },
 ];
 
 export const MODELS = [

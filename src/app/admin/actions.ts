@@ -420,6 +420,31 @@ export async function deleteChannel(formData: FormData) {
   revalidatePath(`/admin/${slug}/channels`);
 }
 
+/**
+ * يولّد سرّ المكالمات — أو يبدّله.
+ *
+ * التبديل يُبطل السرّ القديم فوراً، فأي منصة مكالمات ما زالت تستعمله تتوقف
+ * حتى تُحدَّث. هذا هو المقصود: هذا هو زر «تسرّب السرّ».
+ */
+export async function rotateVoiceToken(formData: FormData) {
+  await requireAdmin(); // مفاتيح التشغيل بيد مالك المنصة
+  const slug = s(formData.get("slug"))!;
+  const tenantId = await authorizeTenant(slug);
+
+  const token = `vk_${crypto.randomUUID().replace(/-/g, "")}`;
+  await prisma.tenant.update({ where: { id: tenantId }, data: { voiceToken: token } });
+  revalidatePath(`/admin/${slug}/channels`);
+}
+
+/** يوقف المكالمات بإزالة السرّ — لا سرّ، لا نداء مقبول. */
+export async function revokeVoiceToken(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData.get("slug"))!;
+  const tenantId = await authorizeTenant(slug);
+  await prisma.tenant.update({ where: { id: tenantId }, data: { voiceToken: null } });
+  revalidatePath(`/admin/${slug}/channels`);
+}
+
 // ═══════════════════════════════════════════════════════════
 //  المحادثات
 // ═══════════════════════════════════════════════════════════
