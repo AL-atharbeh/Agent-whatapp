@@ -125,6 +125,12 @@ model Tenant {
   handoffKeywords  String[] @default([]) // كلمات تفرض التحويل لموظف بشري فوراً
   maxRepliesPerDay Int      @default(2000) // سقف حماية من الاستنزاف
 
+  /**
+   * الرد بفويس على من يرسل فويس. الفويس الوارد يُفرَّغ دائماً بلا إعداد —
+   * أما الرد المنطوق فله كلفة لكل رسالة، فيبقى اختيار صاحب المتجر.
+   */
+  voiceReplies Boolean @default(false)
+
   profile       BusinessProfile?
   products      Product[]
   faqs          Faq[]

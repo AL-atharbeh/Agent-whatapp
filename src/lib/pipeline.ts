@@ -2,7 +2,8 @@ import { prisma } from "./db";
 import { decrypt } from "./crypto";
 import { planAllowsChannel } from "./plans";
 import { runAgentTurn } from "./agent/engine";
-import { sendMessage } from "./channels/meta";
+import { downloadAudio, sendAudio, sendMessage } from "./channels/meta";
+import { MAX_TTS_CHARS, synthesize, transcribe } from "./speech";
 import type { InboundMessage } from "./channels/types";
 import {
   loadTenantById,
@@ -36,6 +37,9 @@ function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
 
 const UNSUPPORTED_REPLY =
   "وصلني مرفقك بس ما بقدر أشوفه هون. ممكن تكتبلي طلبك بالكلام؟ أو بحوّلك لموظف يساعدك 🙏";
+
+const VOICE_FAILED_REPLY =
+  "وصلني الفويس بس ما قدرت أسمعه منيح. ممكن تعيده أو تكتبلي طلبك؟ 🙏";
 
 export async function handleInbound(msg: InboundMessage): Promise<void> {
   // 1) حلّ العميل من حساب القناة. لا وجود لحساب ⇒ رسالة ليست لنا.
@@ -78,24 +82,44 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
       msg.customerName,
     );
 
-    const userText = msg.text?.trim() || `[${msg.unsupportedKind ?? "غير نصي"}]`;
+    // 2ب) فويس وارد ⇒ نفرّغه ونكمل به كأنه نص. يسبق تخزين الرسالة حتى
+    // يظهر في «المحادثات» نصاً مقروءاً لا سطراً مبهماً.
+    let transcript: string | null = null;
+    if (msg.audio) {
+      transcript = await transcribeInbound(tenant.id, msg, tenant.locale);
+    }
+
+    const userText =
+      transcript ?? msg.text?.trim() ?? "";
+    const storedText =
+      transcript ? `🎤 ${transcript}` : userText || `[${msg.unsupportedKind ?? "غير نصي"}]`;
+
     await scope.addMessage({
       conversationId: convo.id,
       role: "USER",
-      text: userText,
+      text: storedText,
       externalId: msg.externalMessageId,
     });
 
     // 3) المحادثة محوّلة لموظف بشري ⇒ الوكيل يصمت تماماً.
     if (convo.status === "HUMAN") return;
 
+    // الرد بفويس لمن أرسل فويس فقط — ومن كتب نصاً يبقى رده مكتوباً.
+    const speak = Boolean(transcript) && tenant.voiceReplies;
+
     const reply = async (text: string) => {
       await scope.addMessage({ conversationId: convo.id, role: "AGENT", text });
-      await deliver(tenant.id, msg, text);
+      await deliver(tenant.id, msg, text, speak);
     };
 
+    // 4ب) فويس وصل لكن تفريغه فشل — نعتذر بدل الصمت
+    if (msg.audio && !transcript) {
+      await reply(VOICE_FAILED_REPLY);
+      return;
+    }
+
     // 4) مرفق غير مدعوم
-    if (msg.unsupportedKind) {
+    if (msg.unsupportedKind || !userText) {
       await reply(UNSUPPORTED_REPLY);
       return;
     }
@@ -155,7 +179,46 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
   });
 }
 
-async function deliver(tenantId: string, msg: InboundMessage, text: string) {
+/** ينزّل الفويس الوارد ويفرّغه. يرجّع null عند أي فشل — والمنادي يقرر الرد. */
+async function transcribeInbound(
+  tenantId: string,
+  msg: InboundMessage,
+  locale: string,
+): Promise<string | null> {
+  const account = await tenantScope(tenantId).channelAccount(msg.channel);
+  if (!account?.accessTokenEnc) {
+    console.error("[pipeline] لا يوجد رمز وصول لتنزيل الصوت:", msg.channel, tenantId);
+    return null;
+  }
+
+  const file = await downloadAudio({
+    mediaId: msg.audio?.mediaId,
+    url: msg.audio?.url,
+    accessToken: decrypt(account.accessTokenEnc),
+  });
+  if (!file.ok) {
+    console.error("[pipeline] فشل تنزيل الفويس:", file.error);
+    return null;
+  }
+
+  const out = await transcribe({
+    audio: file.audio,
+    mimeType: file.mimeType ?? msg.audio?.mimeType,
+    locale,
+  });
+  if (!out.ok) {
+    console.error("[pipeline] فشل تفريغ الفويس:", out.error);
+    return null;
+  }
+  return out.value;
+}
+
+async function deliver(
+  tenantId: string,
+  msg: InboundMessage,
+  text: string,
+  speak = false,
+) {
   if (msg.channel === "WEB") return; // واجهة الويب تقرأ الرد من الاستجابة مباشرة
 
   const scope = tenantScope(tenantId);
@@ -164,13 +227,34 @@ async function deliver(tenantId: string, msg: InboundMessage, text: string) {
     console.error("[pipeline] لا يوجد رمز وصول للقناة:", msg.channel, tenantId);
     return;
   }
+  const accessToken = decrypt(account.accessTokenEnc);
+
+  // الصوت محاولة أولى لا التزام: أي تعثّر — نص طويل، موديل محجوب، رفض من ميتا —
+  // يسقط للنص بدل أن يضيع الرد على العميل.
+  if (speak && msg.channel === "WHATSAPP" && text.length <= MAX_TTS_CHARS) {
+    const voice = await synthesize({ text });
+    if (voice.ok) {
+      const res = await sendAudio({
+        channel: msg.channel,
+        accountExternalId: account.externalId,
+        to: msg.externalUserId,
+        audio: voice.value.audio,
+        mimeType: voice.value.mimeType,
+        accessToken,
+      });
+      if (res.ok) return;
+      console.error("[pipeline] فشل إرسال الفويس، يرجع للنص:", res.error);
+    } else {
+      console.error("[pipeline] فشل توليد الفويس، يرجع للنص:", voice.error);
+    }
+  }
 
   const res = await sendMessage({
     channel: msg.channel,
     accountExternalId: account.externalId,
     to: msg.externalUserId,
     text,
-    accessToken: decrypt(account.accessTokenEnc),
+    accessToken,
   });
   if (!res.ok) console.error("[pipeline] فشل الإرسال:", res.error);
 }

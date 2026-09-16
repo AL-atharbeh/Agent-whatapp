@@ -17,7 +17,12 @@ export type InboundMessage = {
   externalMessageId: string;
   customerName?: string;
   text: string;
-  /** رسالة غير نصية (صورة/صوت/ملف) — نتعامل معها برد مختلف */
+  /**
+   * فويس وارد. `mediaId` لواتساب (يُستبدل برابط مؤقت عبر Graph)،
+   * و`url` لماسنجر وانستقرام (يصل جاهزاً في الويبهوك).
+   */
+  audio?: { mediaId?: string; url?: string; mimeType?: string };
+  /** رسالة غير نصية ولا صوتية (صورة/ملف) — نتعامل معها برد مختلف */
   unsupportedKind?: string;
 };
 

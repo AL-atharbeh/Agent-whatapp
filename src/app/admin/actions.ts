@@ -101,6 +101,7 @@ export async function updateTenant(formData: FormData) {
         .split(/[,،\n]/)
         .map((k) => k.trim())
         .filter(Boolean),
+      voiceReplies: formData.get("voiceReplies") !== null,
 
       // إعدادات التكلفة والتفعيل بيد مالك المنصة وحده: صاحب المتجر لا يرفع
       // سقف الإنفاق ولا يفعّل اشتراكه بنفسه.

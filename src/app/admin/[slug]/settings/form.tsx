@@ -142,6 +142,22 @@ export default async function SettingsForm({
             />
           </label>
 
+          <div className="checkline">
+            <input
+              type="checkbox"
+              name="voiceReplies"
+              id="voiceReplies"
+              defaultChecked={t.voiceReplies}
+            />
+            <label htmlFor="voiceReplies" style={{ margin: 0, color: "var(--text)" }}>
+              الرد بفويس على من يرسل فويس
+            </label>
+          </div>
+          <p className="hint" style={{ margin: "-6px 0 16px" }}>
+            الفويس الوارد يُفرَّغ لنص دائماً. هذا الخيار يجعل الرد مسموعاً أيضاً —
+            على الواتساب فقط، ولمن أرسل فويساً فقط. من يكتب نصاً يبقى رده مكتوباً.
+          </p>
+
           <div className="grid3">
             <label>
               <span>العملة</span>
