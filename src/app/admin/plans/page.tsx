@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { ALL_CHANNELS, MODELS } from "@/lib/plans";
+import { ALL_CHANNELS, MODELS, SUBSCRIPTION_LABEL } from "@/lib/plans";
 import { deletePlan, savePlan, syncPlanToTenants } from "@/app/(billing)/plan-actions";
 import { Reveal, Counter } from "@/components/motion";
 
@@ -162,6 +162,81 @@ function PlanForm({ plan }: { plan?: PlanRow }) {
   );
 }
 
+type Subscriber = {
+  name: string;
+  slug: string;
+  subscription: string;
+  monthlyPrice: unknown;
+  expiresAt: Date | null;
+  users: { email: string }[];
+};
+
+/**
+ * مشتركو الباقة بالاسم.
+ *
+ * العدد وحده لا يكفي لاتخاذ قرار: رفع سعر أو تشديد حد يمسّ متاجر بعينها،
+ * ومالك المنصة يحتاج أن يعرف أيّها قبل الضغط على «طبّق الحدود».
+ */
+function SubscriberList({ rows }: { rows: Subscriber[] }) {
+  if (rows.length === 0) {
+    return (
+      <p className="hint" style={{ margin: "12px 0 0" }}>
+        لا يوجد متاجر على هذه الباقة بعد.
+      </p>
+    );
+  }
+
+  const day = (d: Date | null) =>
+    d ? new Intl.DateTimeFormat("ar-JO", { dateStyle: "medium" }).format(d) : null;
+
+  return (
+    <div style={{ margin: "14px 0 4px" }}>
+      <div className="hint" style={{ marginBottom: 8 }}>
+        المشتركون ({rows.length})
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {rows.map((s) => {
+          const st = SUBSCRIPTION_LABEL[s.subscription] ?? SUBSCRIPTION_LABEL.NONE;
+          const ends = day(s.expiresAt);
+          return (
+            <div
+              key={s.slug}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                flexWrap: "wrap",
+                padding: "8px 12px",
+                border: "1px solid var(--border)",
+                borderRadius: 10,
+              }}
+            >
+              <Link href={`/admin/${s.slug}`} style={{ fontWeight: 600, fontSize: 14 }}>
+                {s.name}
+              </Link>
+              <span className={`pill ${st.cls}`}>{st.label}</span>
+              {s.monthlyPrice != null && (
+                <span className="pill">{Number(s.monthlyPrice)} د</span>
+              )}
+              <span className="hint" style={{ margin: 0, fontSize: 12.5 }}>
+                {s.users[0]?.email ?? "بلا حساب مرتبط"}
+                {ends && ` · حتى ${ends}`}
+              </span>
+              <Link
+                className="btn ghost"
+                href={`/admin/${s.slug}/billing`}
+                style={{ marginInlineStart: "auto", padding: "4px 10px", fontSize: 12.5 }}
+              >
+                الاشتراك
+              </Link>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default async function PlansPage() {
   await requireAdmin();
 
@@ -174,6 +249,22 @@ export default async function PlansPage() {
     by: ["plan", "subscription"],
     _count: { _all: true },
     _sum: { monthlyPrice: true },
+  });
+
+  // ومَن هم. الرقم يقول «اثنان»، وهذا يقول أيّ اثنين — وهو ما يُتصرَّف بناءً عليه
+  // عند رفع سعر أو تعديل حدود.
+  const subscribers = await prisma.tenant.findMany({
+    where: { plan: { not: null } },
+    orderBy: [{ subscription: "asc" }, { name: "asc" }],
+    select: {
+      name: true,
+      slug: true,
+      plan: true,
+      subscription: true,
+      monthlyPrice: true,
+      expiresAt: true,
+      users: { select: { email: true }, take: 1 },
+    },
   });
 
   const statsOf = (tier: string) => {
@@ -259,6 +350,8 @@ export default async function PlansPage() {
                 · {p.modelId}
                 {st.others > 0 && ` · ${st.others} غير نشط`}
               </div>
+
+              <SubscriberList rows={subscribers.filter((s) => s.plan === p.tier)} />
 
               <PlanForm plan={p} />
 
