@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_Arabic, Orbitron } from "next/font/google";
 import "./globals.css";
+import { Suspense } from "react";
+import { RouteProgress } from "@/components/pending";
 
 /**
  * خطّان فقط:
@@ -41,6 +43,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ar" dir="rtl" className={`${plex.variable} ${orbitron.variable}`}>
       <body>
         <div className="bg-fx" aria-hidden="true" />
+        {/* useSearchParams داخل RouteProgress يوجب حدّ Suspense في بناء Next */}
+        <Suspense fallback={null}>
+          <RouteProgress />
+        </Suspense>
         {children}
       </body>
     </html>

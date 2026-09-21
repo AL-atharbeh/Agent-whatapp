@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { deleteTenant, updateProfile, updateTenant } from "../../actions";
 import { BUSINESS_TYPES } from "../../types";
 import Readiness from "../readiness";
+import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +87,7 @@ export default async function SettingsForm({
             <input type="text" name="paymentMethods" defaultValue={p?.paymentMethods ?? ""} />
           </label>
 
-          <button type="submit">حفظ معلومات المتجر</button>
+          <SubmitButton>حفظ معلومات المتجر</SubmitButton>
         </form>
       </div>
 
@@ -209,7 +210,7 @@ export default async function SettingsForm({
             </label>
           )}
 
-          <button type="submit">حفظ إعدادات الوكيل</button>
+          <SubmitButton>حفظ إعدادات الوكيل</SubmitButton>
         </form>
       </div>
 
@@ -220,9 +221,9 @@ export default async function SettingsForm({
         <p className="hint">حذف المتجر يمسح كتالوجه ومحادثاته وكل بياناته نهائياً.</p>
         <form action={deleteTenant}>
           <input type="hidden" name="slug" value={slug} />
-          <button type="submit" className="danger">
+          <SubmitButton className="danger">
             حذف المتجر نهائياً
-          </button>
+          </SubmitButton>
         </form>
       </div>
       )}

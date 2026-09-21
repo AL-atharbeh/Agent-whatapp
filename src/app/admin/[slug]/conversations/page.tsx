@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { forceHandoff, resumeBot } from "../../actions";
+import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
 
@@ -102,15 +103,15 @@ export default async function ConversationsPage({
               <form action={resumeBot}>
                 <input type="hidden" name="slug" value={slug} />
                 <input type="hidden" name="id" value={c.id} />
-                <button type="submit">إعادة المحادثة للوكيل</button>
+                <SubmitButton>إعادة المحادثة للوكيل</SubmitButton>
               </form>
             ) : (
               <form action={forceHandoff}>
                 <input type="hidden" name="slug" value={slug} />
                 <input type="hidden" name="id" value={c.id} />
-                <button type="submit" className="ghost">
+                <SubmitButton className="ghost">
                   تحويل لموظف بشري
-                </button>
+                </SubmitButton>
               </form>
             )}
           </div>

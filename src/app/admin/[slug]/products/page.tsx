@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { bulkImportProducts, deleteProduct, saveProduct } from "../../actions";
 import { ATTRIBUTE_EXAMPLES, PRICE_UNITS } from "../../types";
+import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
 
@@ -105,7 +106,7 @@ function ProductForm({
         </label>
       </div>
 
-      <button type="submit">{product ? "حفظ التعديلات" : "إضافة المنتج"}</button>
+      <SubmitButton>{product ? "حفظ التعديلات" : "إضافة المنتج"}</SubmitButton>
     </form>
   );
 }
@@ -161,7 +162,7 @@ export default async function ProductsPage({
               الصنف والسعر والوصف اختيارية — اترك مكانها فارغاً بين الفواصل. مفيد لإدخال
               كتالوج كامل بنسخة واحدة من ملف Excel.
             </p>
-            <button type="submit">استيراد</button>
+            <SubmitButton>استيراد</SubmitButton>
           </form>
         </div>
       </details>
@@ -193,9 +194,9 @@ export default async function ProductsPage({
             <form action={deleteProduct} style={{ marginTop: 8 }}>
               <input type="hidden" name="slug" value={slug} />
               <input type="hidden" name="id" value={p.id} />
-              <button type="submit" className="danger">
+              <SubmitButton className="danger">
                 حذف المنتج
-              </button>
+              </SubmitButton>
             </form>
           </div>
         </details>

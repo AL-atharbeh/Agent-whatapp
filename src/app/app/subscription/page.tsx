@@ -3,6 +3,7 @@ import { listPlans, getPlan, SUBSCRIPTION_LABEL } from "@/lib/plans";
 import { requestPlan } from "@/app/(billing)/actions";
 import { Reveal } from "@/components/motion";
 import { IconCheck } from "@/components/icons";
+import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
 
@@ -128,8 +129,7 @@ export default async function SubscriptionPage({
 
               <form action={requestPlan}>
                 <input type="hidden" name="plan" value={p.tier} />
-                <button
-                  type="submit"
+                <SubmitButton
                   className={p.highlight && !isCurrent ? "block" : "block ghost"}
                   disabled={isCurrent}
                 >
@@ -140,7 +140,7 @@ export default async function SubscriptionPage({
                       : tenant.plan
                         ? "غيّر لهذي الباقة"
                         : "اختر هذي الباقة"}
-                </button>
+                </SubmitButton>
               </form>
             </div>
           );

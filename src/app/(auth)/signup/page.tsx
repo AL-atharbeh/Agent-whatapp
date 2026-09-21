@@ -3,6 +3,7 @@ import { signup } from "../actions";
 import { BUSINESS_TYPES } from "@/app/admin/types";
 import { Mark, Wordmark } from "@/components/brand";
 import { Reveal } from "@/components/motion";
+import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "إنشاء حساب" };
@@ -104,9 +105,9 @@ export default async function SignupPage({
               />
             </label>
 
-            <button type="submit" className="block lg">
+            <SubmitButton className="block lg">
               إنشاء الحساب
-            </button>
+            </SubmitButton>
 
             <p
               className="hint"

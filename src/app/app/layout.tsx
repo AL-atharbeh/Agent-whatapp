@@ -3,6 +3,7 @@ import { requireOwnTenant } from "@/lib/session";
 import { logout } from "../(auth)/actions";
 import PortalTabs from "./tabs";
 import { Logo } from "@/components/brand";
+import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +26,9 @@ export default async function PortalLayout({ children }: { children: React.React
           <div className="topbar-actions">
             <span>{tenant.name}</span>
             <form action={logout}>
-              <button type="submit" className="ghost" style={{ padding: "5px 12px" }}>
+              <SubmitButton className="ghost" style={{ padding: "5px 12px" }}>
                 خروج
-              </button>
+              </SubmitButton>
             </form>
           </div>
         </div>

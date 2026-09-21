@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAdmin, currentUser } from "@/lib/session";
 import { logout } from "../(auth)/actions";
 import { Logo } from "@/components/brand";
+import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +22,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/plans">الباقات</Link>
             <span style={{ color: "var(--text-3)" }}>{user?.email}</span>
             <form action={logout}>
-              <button type="submit" className="ghost" style={{ padding: "6px 14px" }}>
+              <SubmitButton className="ghost" style={{ padding: "6px 14px" }}>
                 خروج
-              </button>
+              </SubmitButton>
             </form>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { BUSINESS_TYPES } from "./types";
 import { listPlans, SUBSCRIPTION_LABEL } from "@/lib/plans";
 import { Reveal, Counter } from "@/components/motion";
 import { IconUsers, IconBolt, IconChat, IconChart, IconClock } from "@/components/icons";
+import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
 
@@ -162,7 +163,7 @@ export default async function AdminHome() {
             </label>
           </div>
 
-          <button type="submit">إنشاء المتجر</button>
+          <SubmitButton>إنشاء المتجر</SubmitButton>
         </form>
       </details>
 

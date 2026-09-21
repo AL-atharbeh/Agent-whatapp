@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { deleteFaq, saveFaq } from "../../actions";
+import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ function FaqForm({ slug, faq }: { slug: string; faq?: Faq }) {
           مفعّل
         </label>
       </div>
-      <button type="submit">{faq ? "حفظ التعديلات" : "إضافة السؤال"}</button>
+      <SubmitButton>{faq ? "حفظ التعديلات" : "إضافة السؤال"}</SubmitButton>
     </form>
   );
 }
@@ -82,9 +83,9 @@ export default async function FaqsPage({ params }: { params: Promise<{ slug: str
             <form action={deleteFaq} style={{ marginTop: 8 }}>
               <input type="hidden" name="slug" value={slug} />
               <input type="hidden" name="id" value={f.id} />
-              <button type="submit" className="danger">
+              <SubmitButton className="danger">
                 حذف
-              </button>
+              </SubmitButton>
             </form>
           </div>
         </details>

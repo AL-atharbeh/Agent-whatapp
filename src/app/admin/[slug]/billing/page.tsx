@@ -6,6 +6,7 @@ import {
   extendSubscription,
   suspendSubscription,
 } from "@/app/(billing)/actions";
+import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
 
@@ -114,9 +115,9 @@ export default async function BillingPage({
             />
           </label>
 
-          <button type="submit">
+          <SubmitButton>
             {t.subscription === "ACTIVE" ? "حفظ التغييرات" : "فعّل الاشتراك"}
-          </button>
+          </SubmitButton>
         </form>
       </div>
 
@@ -134,16 +135,16 @@ export default async function BillingPage({
                 defaultValue={1}
                 style={{ width: 80 }}
               />
-              <button type="submit" className="ghost">
+              <SubmitButton className="ghost">
                 تمديد (أشهر)
-              </button>
+              </SubmitButton>
             </form>
 
             <form action={suspendSubscription}>
               <input type="hidden" name="slug" value={slug} />
-              <button type="submit" className="danger">
+              <SubmitButton className="danger">
                 إيقاف الاشتراك
-              </button>
+              </SubmitButton>
             </form>
           </div>
           <p className="hint" style={{ margin: "12px 0 0" }}>

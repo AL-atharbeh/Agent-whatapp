@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { deleteDataSource, saveDataSource } from "../../actions";
+import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
 
@@ -96,7 +97,7 @@ function SourceForm({ slug, src }: { slug: string; src?: Source }) {
         </label>
       </div>
 
-      <button type="submit">{src ? "حفظ وتحديث الوقت" : "إضافة المصدر"}</button>
+      <SubmitButton>{src ? "حفظ وتحديث الوقت" : "إضافة المصدر"}</SubmitButton>
     </form>
   );
 }
@@ -148,9 +149,9 @@ export default async function DataPage({ params }: { params: Promise<{ slug: str
               <form action={deleteDataSource} style={{ marginTop: 8 }}>
                 <input type="hidden" name="slug" value={slug} />
                 <input type="hidden" name="id" value={d.id} />
-                <button type="submit" className="danger">
+                <SubmitButton className="danger">
                   حذف
-                </button>
+                </SubmitButton>
               </form>
             </div>
           </details>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { login } from "../actions";
 import { Mark, Wordmark } from "@/components/brand";
 import { Reveal } from "@/components/motion";
+import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "تسجيل الدخول" };
@@ -65,9 +66,9 @@ export default async function LoginPage({
               </p>
             )}
 
-            <button type="submit" className="block lg">
+            <SubmitButton className="block lg">
               دخول
-            </button>
+            </SubmitButton>
           </form>
         </div>
 

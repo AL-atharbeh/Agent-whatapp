@@ -8,6 +8,7 @@ import {
   subscribeChannel,
 } from "../../actions";
 import { CHANNELS } from "../../types";
+import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +79,7 @@ function ChannelForm({ slug, acc }: { slug: string; acc?: Account }) {
         </label>
       </div>
 
-      <button type="submit">{acc ? "حفظ التعديلات" : "ربط القناة"}</button>
+      <SubmitButton>{acc ? "حفظ التعديلات" : "ربط القناة"}</SubmitButton>
     </form>
   );
 }
@@ -130,11 +131,11 @@ export default async function ChannelsPage({
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
               <form action={rotateVoiceToken}>
                 <input type="hidden" name="slug" value={slug} />
-                <button type="submit" className="ghost">بدّل السرّ</button>
+                <SubmitButton className="ghost">بدّل السرّ</SubmitButton>
               </form>
               <form action={revokeVoiceToken}>
                 <input type="hidden" name="slug" value={slug} />
-                <button type="submit" className="danger">أوقف المكالمات</button>
+                <SubmitButton className="danger">أوقف المكالمات</SubmitButton>
               </form>
             </div>
           </>
@@ -146,7 +147,7 @@ export default async function ChannelsPage({
             </p>
             <form action={rotateVoiceToken}>
               <input type="hidden" name="slug" value={slug} />
-              <button type="submit">فعّل المكالمات وولّد سرّاً</button>
+              <SubmitButton>فعّل المكالمات وولّد سرّاً</SubmitButton>
             </form>
           </>
         )}
@@ -251,9 +252,9 @@ export default async function ChannelsPage({
                   </p>
                 )}
 
-                <button type="submit">
+                <SubmitButton>
                   {a.subscribedAt ? "إعادة الاشتراك" : "اشترك الآن"}
-                </button>
+                </SubmitButton>
                 {a.subscribedAt && (
                   <span className="pill ok" style={{ marginInlineStart: 8 }}>
                     مشترك{" "}
@@ -268,9 +269,9 @@ export default async function ChannelsPage({
             <form action={deleteChannel} style={{ marginTop: 16 }}>
               <input type="hidden" name="slug" value={slug} />
               <input type="hidden" name="id" value={a.id} />
-              <button type="submit" className="danger">
+              <SubmitButton className="danger">
                 فصل القناة
-              </button>
+              </SubmitButton>
             </form>
           </div>
         </details>

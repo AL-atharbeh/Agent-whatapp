@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/session";
 import { ALL_CHANNELS, MODELS, SUBSCRIPTION_LABEL } from "@/lib/plans";
 import { deletePlan, savePlan, syncPlanToTenants } from "@/app/(billing)/plan-actions";
 import { Reveal, Counter } from "@/components/motion";
+import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
 
@@ -157,7 +158,7 @@ function PlanForm({ plan }: { plan?: PlanRow }) {
         </label>
       </div>
 
-      <button type="submit">{plan ? "حفظ التعديلات" : "إنشاء الباقة"}</button>
+      <SubmitButton>{plan ? "حفظ التعديلات" : "إنشاء الباقة"}</SubmitButton>
     </form>
   );
 }
@@ -367,16 +368,16 @@ export default async function PlansPage() {
               >
                 <form action={syncPlanToTenants}>
                   <input type="hidden" name="id" value={p.id} />
-                  <button type="submit" className="ghost">
+                  <SubmitButton className="ghost">
                     طبّق الحدود على {st.active} متجر
-                  </button>
+                  </SubmitButton>
                 </form>
 
                 <form action={deletePlan}>
                   <input type="hidden" name="id" value={p.id} />
-                  <button type="submit" className="danger">
+                  <SubmitButton className="danger">
                     حذف الباقة
-                  </button>
+                  </SubmitButton>
                 </form>
               </div>
               <p className="hint" style={{ margin: "10px 0 0" }}>
