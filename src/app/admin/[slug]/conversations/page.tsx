@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { forceHandoff, resumeBot } from "../../actions";
+import { forceHandoff, replyAsHuman, resumeBot } from "../../actions";
 import { SubmitButton } from "@/components/pending";
+import { LiveRefresh } from "@/components/live";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,13 @@ export default async function ConversationsPage({
         </p>
       </div>
 
-      <h2>المحادثات ({convos.length})</h2>
+      <div
+        className="row"
+        style={{ alignItems: "center", gap: 14, flexWrap: "wrap" }}
+      >
+        <h2 style={{ margin: 0 }}>المحادثات ({convos.length})</h2>
+        <LiveRefresh />
+      </div>
 
       {convos.length === 0 && <div className="card">لا يوجد محادثات بعد.</div>}
 
@@ -98,6 +105,25 @@ export default async function ConversationsPage({
                 );
               })}
             </div>
+
+            {/* رد الموظف — متاح فقط بعد التحويل، وإلا تصادم ردّان على العميل */}
+            {c.status === "HUMAN" && c.channel !== "WEB" && (
+              <form action={replyAsHuman} style={{ marginBottom: 14 }}>
+                <input type="hidden" name="slug" value={slug} />
+                <input type="hidden" name="id" value={c.id} />
+                <label>
+                  <span>ردّك كموظف (يُرسل للعميل على {CHANNEL_LABEL[c.channel] ?? c.channel})</span>
+                  <textarea
+                    name="text"
+                    rows={3}
+                    required
+                    maxLength={4000}
+                    placeholder="اكتب ردك هنا…"
+                  />
+                </label>
+                <SubmitButton pendingText="يُرسل…">إرسال للعميل</SubmitButton>
+              </form>
+            )}
 
             {c.status === "HUMAN" ? (
               <form action={resumeBot}>

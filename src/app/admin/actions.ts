@@ -9,6 +9,7 @@ import { authorizeTenant, getSession, requireAdmin } from "@/lib/session";
 import { normalizeArabic } from "@/lib/arabic";
 import { ALL_CHANNELS, getPlan, planAllowsChannel } from "@/lib/plans";
 import { decrypt, encrypt } from "@/lib/crypto";
+import { sendMessage } from "@/lib/channels/meta";
 
 /**
  * إجراءات إدارة المتاجر — يستخدمها مالك المنصة وأصحاب المتاجر معاً.
@@ -497,6 +498,63 @@ export async function revokeVoiceToken(formData: FormData) {
 // ═══════════════════════════════════════════════════════════
 
 /** إعادة محادثة محوّلة لموظف إلى الوكيل. */
+/**
+ * رد موظف بشري داخل محادثة محوّلة.
+ *
+ * بدون هذا كان التحويل طريقاً مسدوداً: الوكيل يصمت، والموظف يرى الرسالة في
+ * اللوحة ولا يملك وسيلة للرد — فيضطر للاتصال بالعميل أو مراسلته من رقم آخر،
+ * وينقطع خيط المحادثة ويضيع سجلّها.
+ *
+ * يُرسل عبر نفس القناة التي جاء منها العميل، ويُحفظ بدور HUMAN فيتميّز في
+ * السجل عن رد الوكيل.
+ */
+export async function replyAsHuman(formData: FormData) {
+  const slug = s(formData.get("slug"))!;
+  const id = s(formData.get("id"))!;
+  const text = s(formData.get("text"));
+  if (!text) throw new Error("اكتب رسالة أولاً");
+  if (text.length > 4000) throw new Error("الرسالة أطول من ٤٠٠٠ حرف");
+
+  const tenantId = await authorizeTenant(slug);
+
+  const convo = await prisma.conversation.findUniqueOrThrow({
+    where: { id, tenantId },
+    select: { channel: true, externalUserId: true },
+  });
+
+  if (convo.channel === "WEB") {
+    throw new Error("محادثات التجربة لا تُرسل — هي ساحة اختبار لا قناة حقيقية");
+  }
+
+  const account = await prisma.channelAccount.findFirst({
+    where: { tenantId, channel: convo.channel, active: true },
+  });
+  if (!account?.accessTokenEnc) {
+    throw new Error("لا يوجد رمز وصول لهذه القناة — راجع إعدادات القنوات");
+  }
+
+  const res = await sendMessage({
+    channel: convo.channel,
+    accountExternalId: account.externalId,
+    to: convo.externalUserId,
+    text,
+    accessToken: decrypt(account.accessTokenEnc),
+  });
+  // لا نحفظ ما لم يُرسَل: سجل يُظهر رسالة لم تصل العميل أسوأ من لا سجل
+  if (!res.ok) throw new Error(`فشل الإرسال: ${res.error}`);
+
+  await prisma.message.create({
+    data: { tenantId, conversationId: id, role: "HUMAN", text },
+  });
+  await prisma.conversation.update({
+    where: { id, tenantId },
+    data: { lastMessageAt: new Date() },
+  });
+
+  revalidatePath(`/admin/${slug}/conversations`);
+  revalidatePath("/app/conversations");
+}
+
 export async function resumeBot(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"))!;
