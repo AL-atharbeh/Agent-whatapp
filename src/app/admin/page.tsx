@@ -92,6 +92,34 @@ export default async function AdminHome() {
         </div>
       </Reveal>
 
+      {/* متاجر موصولة بقنوات لكن وكيلها لا يرد — أخطر حالة في المنصة */}
+      {(() => {
+        const silent = tenants.filter(
+          (t) =>
+            t._count.channels > 0 &&
+            (t.subscription !== "ACTIVE" ||
+              t.status !== "ACTIVE" ||
+              (t.expiresAt != null && t.expiresAt < new Date())),
+        );
+        if (silent.length === 0) return null;
+        return (
+          <div className="alert danger">
+            <strong>⚠️ {silent.length} متجر موصول بقنوات ووكيله لا يرد</strong>
+            <div className="hint" style={{ margin: "6px 0 0", lineHeight: 1.9 }}>
+              رسائل زبائنهم تُحفظ ويصلهم اعتذار مختصر، لكن الوكيل صامت حتى
+              يُفعَّل الاشتراك. هذا أسوأ نوع من الأعطال — لا يصدر عنه صوت.
+            </div>
+            <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {silent.map((t) => (
+                <Link className="btn" key={t.id} href={`/admin/${t.slug}/billing`}>
+                  {t.name} — {SUBSCRIPTION_LABEL[t.subscription]?.label ?? t.subscription}
+                </Link>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {pending.length > 0 && (
         <div className="alert warn">
           <strong>{pending.length} طلب اشتراك بانتظارك</strong> — راجع كل متجر من تبويب

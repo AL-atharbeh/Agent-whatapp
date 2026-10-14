@@ -15,7 +15,7 @@ export default async function PortalHome({
   const sp = await searchParams;
   const { tenant } = await requireOwnTenant();
 
-  const [products, faqs, convos, leads, todayReplies] = await Promise.all([
+  const [products, faqs, convos, leads, todayReplies, channels] = await Promise.all([
     prisma.product.count({ where: { tenantId: tenant.id, active: true } }),
     prisma.faq.count({ where: { tenantId: tenant.id, active: true } }),
     prisma.conversation.count({ where: { tenantId: tenant.id } }),
@@ -27,6 +27,7 @@ export default async function PortalHome({
         createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
       },
     }),
+    prisma.channelAccount.count({ where: { tenantId: tenant.id, active: true } }),
   ]);
 
   return (
@@ -40,6 +41,25 @@ export default async function PortalHome({
 
       <h1>{tenant.name}</h1>
       <p className="sub">وكيلك «{tenant.agentName}» — لوحة إدارته</p>
+
+      {/* صاحب المتجر يستحق أن يعرف أن وكيله صامت، قبل أن يخبره زبون غاضب */}
+      {channels > 0 &&
+        (tenant.subscription !== "ACTIVE" ||
+          tenant.status !== "ACTIVE" ||
+          (tenant.expiresAt != null && tenant.expiresAt < new Date())) && (
+          <div className="alert danger">
+            <strong>⚠️ وكيلك لا يرد على عملائك حالياً</strong>
+            <div className="hint" style={{ margin: "6px 0 0", lineHeight: 1.9 }}>
+              قنواتك موصولة ورسائل زبائنك تُحفظ وتجدها في «المحادثات»، ويصلهم
+              اعتذار مختصر — لكن الوكيل صامت حتى يُفعَّل الاشتراك.
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <Link className="btn" href="/app/subscription">
+                فعّل اشتراكك
+              </Link>
+            </div>
+          </div>
+        )}
 
       <Reveal>
         <div className="stats">

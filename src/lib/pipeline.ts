@@ -41,6 +41,15 @@ const UNSUPPORTED_REPLY =
 const VOICE_FAILED_REPLY =
   "وصلني الفويس بس ما قدرت أسمعه منيح. ممكن تعيده أو تكتبلي طلبك؟ 🙏";
 
+/**
+ * الرد حين تكون الخدمة متوقّفة.
+ *
+ * لا يذكر السبب عمداً: مشاكل الاشتراك بين المنصة وصاحب المتجر، ولا شأن
+ * لزبونه بها — وإخباره أن «اشتراكهم منتهٍ» يضرّ بسمعة المتجر عند زبونه.
+ */
+const SERVICE_PAUSED_REPLY =
+  "وصلتنا رسالتك ✅ حدا من الفريق رح يتواصل معك قريباً. شكراً لصبرك 🙏";
+
 export async function handleInbound(msg: InboundMessage): Promise<void> {
   // 1) حلّ العميل من حساب القناة. لا وجود لحساب ⇒ رسالة ليست لنا.
   const account = await resolveTenantByChannelAccount(msg.channel, msg.accountExternalId);
@@ -50,25 +59,35 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
   }
 
   const tenant = await loadTenantById(account.tenantId);
-  if (!tenant || tenant.status !== "ACTIVE") return;
+  if (!tenant) return;
 
-  // 1ب) الاشتراك — الحدود المعلنة في الباقة تُطبَّق هنا فعلاً، لا في الواجهة فقط
-  if (tenant.subscription !== "ACTIVE") {
-    console.warn(`[pipeline] اشتراك غير نشط: ${tenant.slug} (${tenant.subscription})`);
-    return;
-  }
-  if (tenant.expiresAt && tenant.expiresAt < new Date()) {
-    console.warn(`[pipeline] اشتراك منتهٍ: ${tenant.slug}`);
+  /**
+   * سبب التوقّف إن وُجد — يُحسب هنا ولا يُطبَّق بعد.
+   *
+   * كانت هذه الفحوص ترفض الرسالة فوراً، أي قبل تخزينها. النتيجة أن رسالة
+   * العميل تختفي بلا أثر: لا رد له، ولا سطر في «المحادثات»، ولا تنبيه لصاحب
+   * المتجر — فيرى لوحته فارغة ويظن أن أحداً لم يراسله، ويكتشف الحقيقة بعد
+   * يومين من زبون غاضب.
+   *
+   * الآن نؤجّل التطبيق إلى ما بعد التخزين: الرسالة تُحفظ أولاً دائماً.
+   */
+  let blocked: string | null = null;
+
+  if (tenant.status !== "ACTIVE") {
+    blocked = `المتجر ${tenant.status}`;
+  } else if (tenant.expiresAt && tenant.expiresAt < new Date()) {
+    blocked = "اشتراك منتهٍ";
     await prisma.tenant.update({
       where: { id: tenant.id },
       data: { subscription: "EXPIRED", status: "PAUSED" },
     });
-    return;
+  } else if (tenant.subscription !== "ACTIVE") {
+    blocked = `اشتراك ${tenant.subscription}`;
+  } else if (!(await planAllowsChannel(tenant.plan, msg.channel))) {
+    blocked = `قناة ${msg.channel} خارج باقة ${tenant.plan}`;
   }
-  if (!(await planAllowsChannel(tenant.plan, msg.channel))) {
-    console.warn(`[pipeline] قناة ${msg.channel} خارج باقة ${tenant.plan} — ${tenant.slug}`);
-    return;
-  }
+
+  if (blocked) console.warn(`[pipeline] ${blocked} — ${tenant.slug}`);
 
   const scope = tenantScope(tenant.id);
 
@@ -103,6 +122,25 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
 
     // 3) المحادثة محوّلة لموظف بشري ⇒ الوكيل يصمت تماماً.
     if (convo.status === "HUMAN") return;
+
+    // 3ب) الخدمة متوقّفة (اشتراك/باقة/حالة متجر) ⇒ نعتذر مرة واحدة.
+    //
+    // الصمت يترك الزبون يظن أن الرقم مهجور. والرد مع كل رسالة يحوّل العطل
+    // إلى إزعاج، فنرسله فقط إن لم يكن آخر ما قلناه في هذه المحادثة.
+    if (blocked) {
+      const last = (await scope.recentMessages(convo.id, 6)).findLast(
+        (m) => m.role === "AGENT",
+      );
+      if (last?.text !== SERVICE_PAUSED_REPLY) {
+        await scope.addMessage({
+          conversationId: convo.id,
+          role: "AGENT",
+          text: SERVICE_PAUSED_REPLY,
+        });
+        await deliver(tenant.id, msg, SERVICE_PAUSED_REPLY, false);
+      }
+      return;
+    }
 
     // الرد بفويس لمن أرسل فويس فقط — ومن كتب نصاً يبقى رده مكتوباً.
     const speak = Boolean(transcript) && tenant.voiceReplies;
