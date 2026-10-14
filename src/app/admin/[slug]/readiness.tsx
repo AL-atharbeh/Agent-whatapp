@@ -1,11 +1,31 @@
 import { prisma } from "@/lib/db";
+import { loadTenantBySlug } from "@/lib/tenancy";
+import { buildSystemPrompt } from "@/lib/agent/prompt";
 
 /**
  * قائمة جاهزية الإطلاق لعميل واحد.
  * تجيب على سؤال واحد: هل يصلح تشغيل هذا العميل على الواتساب اليوم؟
  */
 
-type Check = { label: string; ok: boolean; hint: string; critical: boolean };
+type Check = {
+  label: string;
+  ok: boolean;
+  hint: string;
+  critical: boolean;
+  /** قيمة تُعرَض حتى عند النجاح — للبنود التي الرقم فيها هو الفائدة. */
+  note?: string;
+};
+
+/**
+ * سقف تعليمات الوكيل قبل التحذير.
+ *
+ * كل ما يُكتَب في «نبذة» و«الأسئلة الشائعة» و«التعليمات الخاصة» يُرسَل إلى
+ * النموذج **مع كل رسالة**، لا مرة واحدة. ولصق صفحة تعريفية كاملة في «نبذة»
+ * يبدو بلا ثمن، لكنه يضاعف حمولة كل رد: تُستنفد حصّة الدقيقة عند المزوّد
+ * فيبدأ التأخير، وترتفع الكلفة بنفس النسبة — وكلاهما بلا سبب ظاهر لصاحب
+ * المتجر، لأن لا شيء في اللوحة كان يربط ما كتبه بما يدفعه وينتظره.
+ */
+const PROMPT_WARN_TOKENS = 3000;
 
 export default async function Readiness({
   slug,
@@ -27,6 +47,11 @@ export default async function Readiness({
 
   const p = t.profile;
   const liveChannels = t.channels.filter((c) => c.active && c.accessTokenEnc);
+
+  // تقدير تقريبي: العربية ~٣ حروف للتوكن. الدقة هنا غير مهمة — المهم أن
+  // يرى صاحب المتجر الرقم يكبر حين يلصق نصاً طويلاً.
+  const ctx = await loadTenantBySlug(slug);
+  const promptTokens = ctx ? Math.round(buildSystemPrompt(ctx).length / 3) : 0;
 
   const checks: Check[] = [
     {
@@ -57,6 +82,16 @@ export default async function Readiness({
       label: "تعليمات خاصة بالبزنس",
       ok: !!t.customPolicy?.trim(),
       hint: "قواعد التسعير والخصومات الخاصة بهذا المحل",
+      critical: false,
+    },
+    {
+      label: "حجم تعليمات الوكيل",
+      ok: promptTokens <= PROMPT_WARN_TOKENS,
+      note: `${promptTokens.toLocaleString("ar-JO")} توكن مع كل رسالة`,
+      hint:
+        `ما تكتبه في «نبذة» و«الأسئلة الشائعة» و«التعليمات الخاصة» يُرسَل للنموذج ` +
+        `في كل رسالة لا مرة واحدة. تجاوز ${PROMPT_WARN_TOKENS.toLocaleString("ar-JO")} ` +
+        `توكن يبطّئ الردود ويرفع الكلفة. اختصر «نبذة» إلى سطرين — التفاصيل مكانها الأسئلة الشائعة.`,
       critical: false,
     },
     {
@@ -121,6 +156,14 @@ export default async function Readiness({
             </span>
             <div style={{ flex: 1 }}>
               {c.label}
+              {c.note && (
+                <span
+                  className={`pill ${c.ok ? "ok" : "warn"}`}
+                  style={{ marginInlineStart: 8 }}
+                >
+                  {c.note}
+                </span>
+              )}
               {c.critical && !c.ok && (
                 <span className="pill warn" style={{ marginInlineStart: 8 }}>
                   ضروري
