@@ -119,15 +119,11 @@ export function RouteProgress() {
       setActive(true);
     };
 
-    // إرسال نموذج يعيد التوجيه أحياناً — نُظهر الشريط له أيضاً
-    const onSubmit = () => setActive(true);
-
+    // لا نستمع لإرسال النماذج: server action لا يغيّر المسار، فما كان الشريط
+    // ليُطفأ أبداً — يعلق على الشاشة بعد كل حفظ. وأزرار الإرسال تُظهر حالتها
+    // بنفسها عبر SubmitButton، فالشريط للتنقّل وحده.
     document.addEventListener("click", onClick, true);
-    document.addEventListener("submit", onSubmit, true);
-    return () => {
-      document.removeEventListener("click", onClick, true);
-      document.removeEventListener("submit", onSubmit, true);
-    };
+    return () => document.removeEventListener("click", onClick, true);
   }, []);
 
   if (!active) return null;

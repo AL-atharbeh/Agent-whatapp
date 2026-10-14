@@ -517,18 +517,29 @@ export async function replyAsHuman(formData: FormData) {
 
   const tenantId = await authorizeTenant(slug);
 
+  // استعلام واحد يجلب المحادثة وقناتها معاً بدل اثنين متتاليين: كل جولة
+  // إلى قاعدة بعيدة تُضاف مباشرةً إلى الزمن الذي ينتظره الموظف.
   const convo = await prisma.conversation.findUniqueOrThrow({
     where: { id, tenantId },
-    select: { channel: true, externalUserId: true },
+    select: {
+      channel: true,
+      externalUserId: true,
+      tenant: {
+        select: {
+          channels: {
+            where: { active: true },
+            select: { channel: true, externalId: true, accessTokenEnc: true },
+          },
+        },
+      },
+    },
   });
 
   if (convo.channel === "WEB") {
     throw new Error("محادثات التجربة لا تُرسل — هي ساحة اختبار لا قناة حقيقية");
   }
 
-  const account = await prisma.channelAccount.findFirst({
-    where: { tenantId, channel: convo.channel, active: true },
-  });
+  const account = convo.tenant.channels.find((c) => c.channel === convo.channel);
   if (!account?.accessTokenEnc) {
     throw new Error("لا يوجد رمز وصول لهذه القناة — راجع إعدادات القنوات");
   }
@@ -543,16 +554,19 @@ export async function replyAsHuman(formData: FormData) {
   // لا نحفظ ما لم يُرسَل: سجل يُظهر رسالة لم تصل العميل أسوأ من لا سجل
   if (!res.ok) throw new Error(`فشل الإرسال: ${res.error}`);
 
-  await prisma.message.create({
-    data: { tenantId, conversationId: id, role: "HUMAN", text },
-  });
-  await prisma.conversation.update({
-    where: { id, tenantId },
-    data: { lastMessageAt: new Date() },
-  });
+  // الكتابتان معاً في جولة واحدة
+  await prisma.$transaction([
+    prisma.message.create({
+      data: { tenantId, conversationId: id, role: "HUMAN", text },
+    }),
+    prisma.conversation.update({
+      where: { id, tenantId },
+      data: { lastMessageAt: new Date() },
+    }),
+  ]);
 
+  // المسار الذي يراه الموظف الآن فقط — الآخر يلتقط التغيير بنبضته
   revalidatePath(`/admin/${slug}/conversations`);
-  revalidatePath("/app/conversations");
 }
 
 export async function resumeBot(formData: FormData) {

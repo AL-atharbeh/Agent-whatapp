@@ -54,7 +54,7 @@ export default async function ConversationsPage({
         style={{ alignItems: "center", gap: 14, flexWrap: "wrap" }}
       >
         <h2 style={{ margin: 0 }}>المحادثات ({convos.length})</h2>
-        <LiveRefresh />
+        <LiveRefresh slug={slug} />
       </div>
 
       {convos.length === 0 && <div className="card">لا يوجد محادثات بعد.</div>}
