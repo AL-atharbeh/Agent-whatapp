@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { authorizeTenant } from "@/lib/session";
 import Chat from "./chat";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,11 @@ export default async function Playground({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+
+  // الصفحة خارج /admin و /app، فالميدلوير يتحقّق من الجلسة فقط لا من الملكية.
+  // بدون هذا السطر يفتح أي صاحب متجر ساحة تجربة متجر منافس.
+  await authorizeTenant(slug);
+
   const tenant = await prisma.tenant.findUnique({
     where: { slug },
     select: { name: true, agentName: true, slug: true },

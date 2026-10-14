@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { tenantScope } from "@/lib/tenancy";
 import { authorizeTenant, getSession, requireAdmin } from "@/lib/session";
 import { normalizeArabic } from "@/lib/arabic";
+import { ALL_CHANNELS, getPlan, planAllowsChannel } from "@/lib/plans";
 import { decrypt, encrypt } from "@/lib/crypto";
 
 /**
@@ -160,10 +161,38 @@ export async function deleteTenant(formData: FormData) {
 //  المنتجات
 // ═══════════════════════════════════════════════════════════
 
+/**
+ * يتحقّق أن إضافة `adding` منتجاً لا تتجاوز حد الباقة.
+ *
+ * كان `maxProducts` معروضاً في اللوحة ومكتوباً في الباقة ولا يُفحص في أي
+ * مكان — أي أنك تسعّر على فرقٍ غير موجود. التعديل لا يُحسب (لا يزيد العدد)،
+ * والمتجر بلا باقة لا يُقيَّد (مالك المنصة يدخله يدوياً).
+ */
+async function assertProductQuota(tenantId: string, adding: number) {
+  const t = await prisma.tenant.findUniqueOrThrow({
+    where: { id: tenantId },
+    select: { plan: true },
+  });
+  if (!t.plan) return;
+
+  const plan = await getPlan(t.plan);
+  if (!plan) return;
+
+  const current = await prisma.product.count({ where: { tenantId } });
+  if (current + adding > plan.maxProducts) {
+    throw new Error(
+      `باقة «${plan.name}» تسمح بـ ${plan.maxProducts} منتج، وعندك ${current}. ` +
+        `ارفع الباقة أو احذف منتجات أولاً.`,
+    );
+  }
+}
+
 export async function saveProduct(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"));
   const tenantId = await authorizeTenant(slug);
+
+  if (!id) await assertProductQuota(tenantId, 1);
 
   const name = s(formData.get("name"));
   if (!name) throw new Error("اسم المنتج مطلوب");
@@ -222,6 +251,9 @@ export async function bulkImportProducts(formData: FormData) {
     .filter((r) => r.name);
 
   if (rows.length === 0) throw new Error("لم أجد أي سطر صالح");
+
+  // الاستيراد الجماعي هو المسار الأخطر للتجاوز: سطر واحد أو ألف بنفس الضغطة
+  await assertProductQuota(tenantId, rows.length);
 
   await prisma.product.createMany({
     data: rows.map((r) => ({
@@ -334,12 +366,27 @@ export async function saveChannel(formData: FormData) {
   const externalId = s(formData.get("externalId"));
   if (!externalId) throw new Error("معرّف الحساب مطلوب");
 
+  const channel = (s(formData.get("channel")) ?? "WHATSAPP") as Channel;
+
+  // القناة خارج الباقة كانت تُقبل هنا ثم تُرفض عند أول رسالة — بصمت.
+  // النتيجة: ساعة عمل على رموز Meta، ثم رسائل تتبخّر بلا تحذير. نرفض الآن.
+  const tenant = await prisma.tenant.findUniqueOrThrow({
+    where: { id: tenantId },
+    select: { plan: true },
+  });
+  if (!(await planAllowsChannel(tenant.plan, channel))) {
+    const label = ALL_CHANNELS.find((c) => c.value === channel)?.label ?? channel;
+    throw new Error(
+      `قناة «${label}» خارج باقة هذا المتجر. غيّر الباقة أو أضف القناة إليها أولاً.`,
+    );
+  }
+
   const token = s(formData.get("accessToken"));
   const secret = s(formData.get("appSecret"));
 
   const data = {
     tenantId,
-    channel: (s(formData.get("channel")) ?? "WHATSAPP") as Channel,
+    channel,
     externalId,
     displayName: s(formData.get("displayName")),
     verifyToken: s(formData.get("verifyToken")),

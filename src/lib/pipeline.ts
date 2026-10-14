@@ -287,6 +287,19 @@ export async function chatOnce(args: {
   if (!tenant) return { error: "لا يوجد عميل بهذا المعرّف" };
 
   const scope = tenantScope(tenant.id);
+
+  // السقف اليومي يُطبَّق هنا أيضاً.
+  //
+  // كانت ساحة التجربة تتخطّى كل البوابات، فصارت باباً خلفياً: متجر منتهي
+  // اشتراكه — أو مشترك بأرخص باقة — يستهلك النموذج بلا حد ما دام يسأل من
+  // المتصفح. حدود الباقة لا تعني شيئاً إن كان تجاوزها بضغطة.
+  //
+  // أما الاشتراك نفسه فلا يُفحص عمداً: التجربة قبل الدفع هي ما يقنع العميل
+  // بالاشتراك، والسقف اليومي يكفي لمنع الاستنزاف.
+  if ((await scope.repliesToday()) >= tenant.maxRepliesPerDay) {
+    return { error: "تجاوزت سقف الردود اليومي لهذه الباقة. جرّب غداً أو ارفع باقتك." };
+  }
+
   const convo = await scope.getOrCreateConversation("WEB", args.sessionId);
 
   await scope.addMessage({ conversationId: convo.id, role: "USER", text: args.text });
