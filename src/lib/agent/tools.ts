@@ -51,16 +51,11 @@ export function buildTools(args: {
   const searchCatalog = defineTool({
     name: "search_catalog",
     description:
-      `يبحث في كتالوج ${tenant.name}. استخدمه في كل سؤال عن سعر أو توفر أو "شو عندكم". ` +
-      `اترك query فارغاً لعرض كل ما هو متاح — افعل ذلك عند أسئلة الاستعراض العامة.`,
+      `يبحث في كتالوج ${tenant.name}. لكل سؤال عن سعر أو توفر أو "شو عندكم". ` +
+      `query فارغة = اعرض كل المتاح.`,
     schema: z.object({
-      query: z
-        .string()
-        .describe(
-          "كلمات بحث بلغة العميل، مثل: فستان ازرق / خاتم عيار 21. " +
-            "اتركه فارغاً (\"\") لعرض كل المتاح.",
-        ),
-      category: z.string().optional().describe("تضييق البحث على صنف معيّن إن عرفته"),
+      query: z.string().describe("كلمات بحث بلغة العميل. \"\" = كل المتاح."),
+      category: z.string().optional().describe("صنف لتضييق البحث"),
     }),
     run: async (input) => {
       const browsing = !input.query.trim() && !input.category;
@@ -117,11 +112,9 @@ export function buildTools(args: {
   // ── ٢. البيانات الحيّة (سعر الذهب، إلخ) ───────────────────
   const getLiveData = defineTool({
     name: "get_live_data",
-    description:
-      "يجلب قيمة حيّة محدّثة (مثل سعر الذهب اليوم). " +
-      "استخدمه لأي رقم متغيّر بدل الاعتماد على معرفتك.",
+    description: "يجلب قيمة حيّة محدّثة. لأي رقم متغيّر، بدل الاعتماد على معرفتك.",
     schema: z.object({
-      key: z.string().describe("مفتاح المصدر كما هو مذكور في تعليماتك، مثل: gold_price"),
+      key: z.string().describe("مفتاح المصدر كما ورد في تعليماتك"),
     }),
     run: async (input) => {
       const src = await scope.getDataSource(input.key);
@@ -188,10 +181,9 @@ export function buildTools(args: {
   const captureLead = defineTool({
     name: "capture_lead",
     description:
-      "يسجّل عميلاً مهتماً بالشراء لمتابعته لاحقاً من قبل الموظفين. " +
-      "استخدمه عند وجود نية شراء واضحة أو حين يترك العميل رقمه. لا تخبر العميل أنك سجّلته.",
+      "يسجّل عميلاً مهتماً للمتابعة. عند نية شراء واضحة أو ترك رقم. لا تخبر العميل.",
     schema: z.object({
-      interest: z.string().describe("ما الذي يريده العميل تحديداً"),
+      interest: z.string().describe("ما يريده العميل تحديداً"),
       name: z.string().optional(),
       phone: z.string().optional(),
       notes: z.string().optional(),
@@ -207,12 +199,11 @@ export function buildTools(args: {
   const handoff = defineTool({
     name: "handoff_to_human",
     description:
-      "يحوّل المحادثة لموظف بشري ويوقف ردود الوكيل عليها. " +
-      "استخدمه عند: شكوى، تفاوض على السعر، طلب معقّد أو خارج قدرتك، معلومة غير متوفرة لديك، " +
-      "أو طلب العميل الصريح للتحدث مع شخص.",
+      "يحوّل المحادثة لموظف ويُسكِت الوكيل. عند: شكوى، تفاوض سعر، طلب خارج قدرتك، " +
+      "أو طلب العميل الصريح لموظف.",
     schema: z.object({
-      reason: z.string().describe("سبب التحويل — يظهر للموظف"),
-      summary: z.string().describe("ملخّص سطرين لما يريده العميل حتى لا يعيد الشرح"),
+      reason: z.string().describe("سبب التحويل — بالعربية، يظهر للموظف"),
+      summary: z.string().describe("سطران عمّا يريده العميل — بالعربية"),
     }),
     run: async (input) => {
       state.handoff = { requested: true, reason: `${input.reason} — ${input.summary}` };
@@ -225,5 +216,10 @@ export function buildTools(args: {
     },
   });
 
-  return [searchCatalog, getLiveData, captureLead, handoff];
+  // أداة بلا مصدر تغذّيها كلفة بلا مقابل: تعريفها يُرسَل مع كل رسالة، وقد
+  // يستدعيها النموذج ليكتشف أنها فارغة — دورة كاملة ضائعة. فنعرضها فقط
+  // حين يملك المتجر مصدراً حيّاً فعلاً.
+  const tools = [searchCatalog, captureLead, handoff];
+  if (tenant.dataSources.length) tools.splice(1, 0, getLiveData);
+  return tools;
 }

@@ -39,3 +39,26 @@ export const emptyUsage = (): ProviderUsage => ({
   cache_read_input_tokens: 0,
   cache_creation_input_tokens: 0,
 });
+
+/**
+ * تجاوز سعة المزوّد — حالة مختلفة عن العطل.
+ *
+ * عند `429` تنتظر مكتبة العميل المدّة التي يطلبها المزوّد ثم تعيد المحاولة.
+ * بدا ذلك سليماً، لكنه في مسار واتساب يعني أن العميل يرسل سؤالاً فلا يرى
+ * شيئاً دقيقة كاملة ثم يصل الرد — ولا أحد يعرف لماذا: لا سطر في السجل، ولا
+ * إشارة في اللوحة، والمتجر يظن أن النظام بطيء.
+ *
+ * فنحدّ الانتظار ونرفع الحالة باسمها، ليقرّر خط المعالجة ماذا يقول للعميل
+ * ويُسجَّل السبب الحقيقي: السعة نفدت، لا الوكيل تعطّل.
+ */
+export class CapacityError extends Error {
+  readonly retryAfterSeconds: number | null;
+  constructor(provider: string, retryAfterSeconds: number | null) {
+    super(
+      `تجاوز سعة المزوّد ${provider}` +
+        (retryAfterSeconds ? ` — إعادة المحاولة بعد ${retryAfterSeconds}s` : ""),
+    );
+    this.name = "CapacityError";
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}

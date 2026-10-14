@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { decrypt } from "./crypto";
 import { planAllowsChannel } from "./plans";
 import { runAgentTurn } from "./agent/engine";
+import { CapacityError } from "./agent/providers/types";
 import { downloadAudio, sendAudio, sendMessage } from "./channels/meta";
 import { MAX_TTS_CHARS, synthesize, transcribe } from "./speech";
 import type { InboundMessage } from "./channels/types";
@@ -49,6 +50,16 @@ const VOICE_FAILED_REPLY =
  */
 const SERVICE_PAUSED_REPLY =
   "وصلتنا رسالتك ✅ حدا من الفريق رح يتواصل معك قريباً. شكراً لصبرك 🙏";
+
+/**
+ * نفاد سعة المزوّد — رد فوري بدل انتظار صامت.
+ *
+ * البديل أن ننتظر فتح النافذة ثم نرد، فيقضي العميل دقيقة أمام شاشة ساكنة.
+ * الرد الفوري الصادق أرحم: يعرف أن رسالته وصلت، والمحادثة تُحوَّل لموظف
+ * فيبقى لها صاحب بدل أن تضيع.
+ */
+const AT_CAPACITY_REPLY =
+  "وصلتني رسالتك ✅ في ضغط هلأ، حدا من الفريق رح يرد عليك خلال دقائق 🙏";
 
 export async function handleInbound(msg: InboundMessage): Promise<void> {
   // 1) حلّ العميل من حساب القناة. لا وجود لحساب ⇒ رسالة ليست لنا.
@@ -205,6 +216,17 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
         userMessage: userText,
       });
     } catch (err) {
+      // السعة ليست عطلاً. دمجهما تحت «خطأ تقني» يُخفي عن صاحب المتجر أن
+      // حصّته عند المزوّد هي ما ضاقت — وهو الشيء الوحيد الذي يملك إصلاحه.
+      if (err instanceof CapacityError) {
+        console.warn(`[pipeline] نفاد سعة المزوّد — ${tenant.slug}: ${err.message}`);
+        await scope.handoff(
+          convo.id,
+          `نفاد سعة المزوّد (${err.retryAfterSeconds ?? "؟"} ثانية حتى التجديد) — ارفع حصّة المزوّد`,
+        );
+        await reply(AT_CAPACITY_REPLY);
+        return;
+      }
       console.error("[pipeline] فشل الوكيل:", err);
       await scope.handoff(convo.id, "خطأ تقني في الوكيل");
       await reply("صار عندي خلل بسيط، رح يتواصل معك أحد الزملاء 🙏");

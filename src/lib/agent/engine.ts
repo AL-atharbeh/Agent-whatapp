@@ -57,6 +57,14 @@ export type AgentTurnResult = {
 
 export type HistoryItem = { role: MessageRole; text: string };
 
+/**
+ * سقف حروف التاريخ المُرسَل مع كل رسالة (≈ ٨٠٠ توكن).
+ *
+ * خدمة العملاء تعيش في آخر بضع رسائل؛ ما قبلها نادراً ما يغيّر الرد، بينما
+ * كلفته تُدفع في كل نداء.
+ */
+const MAX_HISTORY_CHARS = 2400;
+
 export async function runAgentTurn(args: {
   tenant: TenantContext;
   scope: TenantScope;
@@ -73,12 +81,25 @@ export async function runAgentTurn(args: {
 
   // التاريخ: نص فقط. لا نعيد إرسال نداءات الأدوات القديمة — تكلفة بلا فائدة
   // في محادثة خدمة عملاء، وتُبقي البادئة مستقرة للكاش.
-  const cleanHistory = history
-    .filter((h) => h.text?.trim())
-    .map((h) => ({
-      role: (h.role === "USER" ? "user" : "assistant") as "user" | "assistant",
-      text: h.text,
-    }));
+  //
+  // ونقصّه بميزانية حروف لا بعدد رسائل: عشرون رسالة قد تكون مئتي حرف أو
+  // ستة آلاف، فالعدد وحده لا يحدّ شيئاً. وفي محادثة طويلة ينتفخ التاريخ حتى
+  // يبتلع حصّة الدقيقة عند المزوّد فتبدأ الردود تتأخّر بلا سبب ظاهر —
+  // الأحدث أهم دائماً، فنُبقيه ونُسقط الأقدم.
+  const kept: HistoryItem[] = [];
+  let budget = MAX_HISTORY_CHARS;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const h = history[i];
+    if (!h.text?.trim()) continue;
+    budget -= h.text.length;
+    if (budget < 0) break;
+    kept.unshift(h);
+  }
+
+  const cleanHistory = kept.map((h) => ({
+    role: (h.role === "USER" ? "user" : "assistant") as "user" | "assistant",
+    text: h.text,
+  }));
 
   const now = new Date().toLocaleString("ar-JO", {
     timeZone: tenant.timezone,
