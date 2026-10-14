@@ -12,7 +12,8 @@
     "chat": "tsx scripts/simulate.ts",
     "verify": "tsx scripts/verify-isolation.ts",
     "admin": "tsx --env-file=.env scripts/create-admin.ts",
-    "password": "tsx --env-file=.env scripts/reset-password.ts"
+    "password": "tsx --env-file=.env scripts/reset-password.ts",
+    "seed:plans": "tsx --env-file=.env scripts/seed-plans.ts"
   },
   "prisma": {
     "seed": "tsx scripts/seed.ts"
