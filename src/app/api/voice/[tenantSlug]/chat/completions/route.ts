@@ -104,6 +104,20 @@ export async function POST(
   const tenant = await loadTenantById(row.id);
   if (!tenant) return err(404, "تعذّر تحميل المتجر");
 
+  // الحدود تُطبَّق على المكالمات أيضاً.
+  //
+  // هذه النقطة عامة تناديها منصة خارجية، فسرّ مسرَّب أو حلقة في إعداد المنصة
+  // يستنزفان الرصيد بسرعة أكبر من أي قناة أخرى — المكالمة تُحتسب بالدقيقة.
+  const scope = tenantScope(tenant.id);
+  if ((await scope.repliesLastMinute()) >= tenant.maxRepliesPerMinute) {
+    console.warn(`[voice] تجاوز سقف الدقيقة: ${tenantSlug}`);
+    return err(429, "طلبات كثيرة بسرعة");
+  }
+  if ((await scope.repliesToday()) >= tenant.maxRepliesPerDay) {
+    console.warn(`[voice] تجاوز السقف اليومي: ${tenantSlug}`);
+    return err(429, "تجاوز السقف اليومي للردود");
+  }
+
   // معرّف المتصل من المنصة — يربط الأدوات (تسجيل عميل محتمل مثلاً) بمتصل بعينه
   const caller = typeof body.user === "string" && body.user ? body.user : "voice-caller";
 
@@ -111,7 +125,7 @@ export async function POST(
   try {
     const result = await runAgentTurn({
       tenant,
-      scope: tenantScope(tenant.id),
+      scope,
       channel: "VOICE",
       externalUserId: caller,
       history,

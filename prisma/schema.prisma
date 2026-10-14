@@ -66,8 +66,15 @@ model Plan {
 
   monthlyPrice Decimal @db.Decimal(10, 2)
 
-  channels         String[] // WHATSAPP | MESSENGER | INSTAGRAM | WEB
+  channels         String[] // WHATSAPP | MESSENGER | INSTAGRAM | WEB | VOICE
   maxRepliesPerDay Int      @default(200)
+
+  /**
+   * سقف الردود في الدقيقة — حماية من الاندفاع.
+   * السقف اليومي وحده لا يمنع استهلاكه كاملاً في دقيقة واحدة، وهو ما يرفع
+   * الكلفة فجأة ويضغط على حدود المزوّد.
+   */
+  maxRepliesPerMinute Int @default(20)
   maxProducts      Int      @default(500)
 
   // إعدادات النموذج التي تُطبَّق على متاجر هذه الباقة
@@ -124,6 +131,7 @@ model Tenant {
   customPolicy     String? @db.Text // تعليمات إضافية يكتبها صاحب البزنس
   handoffKeywords  String[] @default([]) // كلمات تفرض التحويل لموظف بشري فوراً
   maxRepliesPerDay Int      @default(2000) // سقف حماية من الاستنزاف
+  maxRepliesPerMinute Int  @default(60)  // سقف الاندفاع — يُنسخ من الباقة عند التفعيل
 
   /**
    * الرد بفويس على من يرسل فويس. الفويس الوارد يُفرَّغ دائماً بلا إعداد —

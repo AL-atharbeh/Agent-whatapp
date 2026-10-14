@@ -101,6 +101,15 @@ function PlanForm({ plan }: { plan?: PlanRow }) {
             defaultValue={plan?.maxProducts ?? 500}
           />
         </label>
+        <label>
+          <span>سقف الردود في الدقيقة</span>
+          <input
+            type="number"
+            name="maxRepliesPerMinute"
+            min={1}
+            defaultValue={plan?.maxRepliesPerMinute ?? 20}
+          />
+        </label>
       </div>
 
       <div className="grid2">
@@ -347,7 +356,7 @@ export default async function PlansPage() {
 
             <div style={{ marginTop: 18 }}>
               <div className="hint">
-                {p.channels.length} قناة · {p.maxRepliesPerDay} رد/يوم · {p.maxProducts} منتج
+                {p.channels.length} قناة · {p.maxRepliesPerDay} رد/يوم · {p.maxRepliesPerMinute} رد/دقيقة · {p.maxProducts} منتج
                 · {p.modelId}
                 {st.others > 0 && ` · ${st.others} غير نشط`}
               </div>

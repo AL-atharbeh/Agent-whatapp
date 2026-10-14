@@ -16,6 +16,7 @@ export type Plan = {
   channels: Channel[];
   maxRepliesPerDay: number;
   maxProducts: number;
+  maxRepliesPerMinute: number;
   modelId: string;
   effort: string;
   features: string[];
@@ -34,6 +35,7 @@ const toPlan = (p: Row): Plan => ({
   channels: p.channels as Channel[],
   maxRepliesPerDay: p.maxRepliesPerDay,
   maxProducts: p.maxProducts,
+  maxRepliesPerMinute: p.maxRepliesPerMinute,
   modelId: p.modelId,
   effort: p.effort,
   features: p.features,

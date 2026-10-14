@@ -133,6 +133,16 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
       return;
     }
 
+    // 6أ) سقف الاندفاع — قبل اليومي لأنه أرخص وأسرع كشفاً
+    //
+    // السقف اليومي وحده لا يمنع استهلاكه كاملاً في دقيقة: حلقة آلية أو خلل
+    // في تطبيق عميل تُفرغه فوراً، فترتفع الكلفة وتُضرب حدود المزوّد. ولا نرد
+    // على المندفع برسالة — فالرد نفسه عمل، وهذا ما نحاول تقليله.
+    if ((await scope.repliesLastMinute()) >= tenant.maxRepliesPerMinute) {
+      console.warn(`[pipeline] تجاوز سقف الدقيقة: ${tenant.slug}`);
+      return;
+    }
+
     // 6) سقف الحماية اليومي
     if ((await scope.repliesToday()) >= tenant.maxRepliesPerDay) {
       await scope.handoff(convo.id, "تجاوز السقف اليومي للردود");
@@ -296,6 +306,9 @@ export async function chatOnce(args: {
   //
   // أما الاشتراك نفسه فلا يُفحص عمداً: التجربة قبل الدفع هي ما يقنع العميل
   // بالاشتراك، والسقف اليومي يكفي لمنع الاستنزاف.
+  if ((await scope.repliesLastMinute()) >= tenant.maxRepliesPerMinute) {
+    return { error: "أرسلت رسائل كثيرة بسرعة. انتظر دقيقة وجرّب ثانيةً." };
+  }
   if ((await scope.repliesToday()) >= tenant.maxRepliesPerDay) {
     return { error: "تجاوزت سقف الردود اليومي لهذه الباقة. جرّب غداً أو ارفع باقتك." };
   }

@@ -74,6 +74,7 @@ export async function activateSubscription(formData: FormData) {
 
       // حدود الباقة تُطبَّق على المتجر — لا تبقى وعداً تسويقياً
       maxRepliesPerDay: plan.maxRepliesPerDay,
+      maxRepliesPerMinute: plan.maxRepliesPerMinute,
       modelId: plan.modelId,
       effort: plan.effort,
     },

@@ -249,6 +249,23 @@ export function tenantScope(tenantId: string) {
       });
     },
 
+    /**
+     * ردود آخر دقيقة — حماية من الاندفاع.
+     *
+     * نعدّ من جدول الرسائل لا من عدّاد في الذاكرة: Vercel يشغّل نسخاً متعددة
+     * ولا تشترك في ذاكرتها، فعدّاد محلي يسمح بضعف السقف أو ثلاثة أضعافه حسب
+     * عدد النسخ. الاستعلام على فهرس (tenantId, createdAt) ورخيص.
+     */
+    async repliesLastMinute() {
+      return prisma.message.count({
+        where: {
+          tenantId,
+          role: "AGENT",
+          createdAt: { gte: new Date(Date.now() - 60_000) },
+        },
+      });
+    },
+
     async channelAccount(channel: Channel) {
       return prisma.channelAccount.findFirst({
         where: { tenantId, channel, active: true },

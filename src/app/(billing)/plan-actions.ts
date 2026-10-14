@@ -23,6 +23,7 @@ function readPlan(formData: FormData) {
     channels: formData.getAll("channels").map(String),
     maxRepliesPerDay: n(formData.get("maxRepliesPerDay"), 200),
     maxProducts: n(formData.get("maxProducts"), 500),
+    maxRepliesPerMinute: n(formData.get("maxRepliesPerMinute"), 20),
     modelId: s(formData.get("modelId")) ?? "claude-sonnet-5",
     effort: s(formData.get("effort")) ?? "low",
     // ميزة لكل سطر — أسهل للكتابة من JSON
@@ -88,6 +89,7 @@ export async function syncPlanToTenants(formData: FormData) {
     where: { plan: plan.tier, subscription: "ACTIVE" },
     data: {
       maxRepliesPerDay: plan.maxRepliesPerDay,
+      maxRepliesPerMinute: plan.maxRepliesPerMinute,
       modelId: plan.modelId,
       effort: plan.effort,
     },
