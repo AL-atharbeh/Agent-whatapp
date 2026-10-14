@@ -22,15 +22,28 @@ const PROVIDERS: Record<string, Provider> = {
   groq: groqProvider,
 };
 
-function pickProvider(): Provider {
-  const id = (process.env.AGENT_PROVIDER || "anthropic").toLowerCase();
-  const provider = PROVIDERS[id];
-  if (!provider) {
-    throw new Error(
-      `AGENT_PROVIDER غير معروف: "${id}". المتاح: ${Object.keys(PROVIDERS).join(" | ")}`,
-    );
+/**
+ * المزوّد يُشتق من معرّف النموذج، لا من متغيّر بيئة.
+ *
+ * كان `AGENT_PROVIDER` يحسم المزوّد للمنصة كلها، فاختيار النموذج في الباقة
+ * بلا أثر: تختار Groq فيذهب الطلب إلى Anthropic أو العكس. والاشتقاق من
+ * المعرّف يجعل كل باقة — بل كل متجر — تختار مزوّدها فعلاً، ويسمح بتشغيل
+ * متاجر مجانية ومدفوعة جنباً إلى جنب.
+ *
+ * `AGENT_PROVIDER` يبقى متاحاً كتجاوز صريح للتجربة المحلية.
+ */
+function providerFor(modelId: string): Provider {
+  const forced = process.env.AGENT_PROVIDER?.toLowerCase();
+  if (forced) {
+    const p = PROVIDERS[forced];
+    if (!p) {
+      throw new Error(
+        `AGENT_PROVIDER غير معروف: "${forced}". المتاح: ${Object.keys(PROVIDERS).join(" | ")}`,
+      );
+    }
+    return p;
   }
-  return provider;
+  return modelId.startsWith("claude-") ? anthropicProvider : groqProvider;
 }
 
 export type AgentTurnResult = {
@@ -56,7 +69,7 @@ export async function runAgentTurn(args: {
 
   const state: RunState = { handoff: null, toolCalls: [] };
   const tools = buildTools({ scope, tenant, channel, externalUserId, state });
-  const provider = pickProvider();
+  const provider = providerFor(tenant.modelId);
 
   // التاريخ: نص فقط. لا نعيد إرسال نداءات الأدوات القديمة — تكلفة بلا فائدة
   // في محادثة خدمة عملاء، وتُبقي البادئة مستقرة للكاش.

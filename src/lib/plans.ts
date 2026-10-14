@@ -86,8 +86,24 @@ export const ALL_CHANNELS: { value: Channel; label: string }[] = [
   { value: "VOICE", label: "المكالمات" },
 ];
 
+/**
+ * النماذج المتاحة للباقات.
+ *
+ * المزوّد يُشتق من المعرّف لا من متغيّر بيئة (انظر `providerFor` في
+ * agent/engine.ts): ما يبدأ بـ claude- يذهب إلى Anthropic، وما عداه إلى Groq.
+ * لولا ذلك لكان الاختيار هنا زينةً لا أثر لها.
+ *
+ * نماذج Groq مجانية حالياً وجودة عربيتها أضعف — تصلح للتجربة والباقات
+ * الاقتصادية، لا لمتجر يُجيب عن أسعار والتزامات مالية.
+ */
 export const MODELS = [
   { value: "claude-haiku-4-5", label: "Haiku — الأسرع والأوفر" },
   { value: "claude-sonnet-5", label: "Sonnet — متوازن" },
   { value: "claude-opus-5", label: "Opus — أعلى جودة" },
+  { value: "qwen/qwen3.8-27b", label: "Qwen 27B — مجاني (Groq) · الأسرع" },
+  { value: "openai/gpt-oss-120b", label: "GPT-OSS 120B — مجاني (Groq) · الأقوى" },
 ];
+
+// `allam-2-7b` مستبعَد رغم أنه عربي أولاً: لا يدعم استدعاء الأدوات
+// (400 `tool calling` is not supported)، ووكيلنا يبني عليها البحث في
+// الكتالوج والتحويل لموظف وتسجيل العميل — فبدونها يصير محادثاً بلا قدرات.

@@ -28,7 +28,14 @@ export const groqProvider: Provider = {
   id: "groq",
 
   async run(req: ProviderRequest) {
-    const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+    // النموذج من باقة المتجر أولاً — وإلا بقي اختيار الباقة بلا أثر.
+    //
+    // معرّف Claude يصل إلى هنا فقط حين يُجبر AGENT_PROVIDER المزوّد على Groq
+    // بينما الباقة تطلب Claude؛ عندها نسقط إلى GROQ_MODEL ثم إلى افتراضي
+    // معروف. والافتراضي القديم (llama-3.3-70b-versatile) لم يعد موجوداً على
+    // Groq، فكان يكسر المسار بصمت.
+    const fromPlan = req.model && !req.model.startsWith("claude-") ? req.model : null;
+    const model = fromPlan ?? process.env.GROQ_MODEL ?? "qwen/qwen3.8-27b";
 
     const toolMap = new Map(req.tools.map((t) => [t.name, t]));
     const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = req.tools.map((t) => ({
