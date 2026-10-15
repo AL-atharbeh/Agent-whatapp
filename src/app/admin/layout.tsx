@@ -3,6 +3,7 @@ import { requireAdmin, currentUser } from "@/lib/session";
 import { logout } from "../(auth)/actions";
 import { Logo } from "@/components/brand";
 import { SubmitButton } from "@/components/pending";
+import { Footer } from "@/components/footer";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       </header>
       {children}
+      <Footer />
     </>
   );
 }

@@ -4,6 +4,7 @@ import { logout } from "../(auth)/actions";
 import PortalTabs from "./tabs";
 import { Logo } from "@/components/brand";
 import { SubmitButton } from "@/components/pending";
+import { Footer } from "@/components/footer";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,7 @@ export default async function PortalLayout({ children }: { children: React.React
         <PortalTabs />
         {children}
       </main>
+      <Footer />
     </>
   );
 }
