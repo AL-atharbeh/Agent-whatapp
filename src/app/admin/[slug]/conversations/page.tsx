@@ -20,6 +20,54 @@ const ROLE_LABEL: Record<string, string> = {
   SYSTEM: "النظام",
 };
 
+/**
+ * هوية العميل في رأس المحادثة: الاسم والمعرّف معاً.
+ *
+ * كان الرأس يعرض الاسم وحده ويسقط للمعرّف حين يغيب. لكن الاسم في واتساب هو
+ * ما يكتبه العميل في ملفه الشخصي: قد يكون نقطة، أو رمزاً، أو اسماً يتكرر بين
+ * عميلين — فلا يصلح وحده للتمييز، ولا يُعاد به الاتصال. الرقم هو المعرّف
+ * الثابت، وهو ما يحتاجه الموظف ليتصل أو يبحث في سجلاته.
+ *
+ * والرقم يُعرَض بـ dir="ltr" معزولاً: خانة واحدة بالاتجاه الخاطئ تقلب
+ * الرقم كله في سياق عربي فيُقرأ معكوساً.
+ */
+function Identity({
+  channel,
+  name,
+  externalId,
+}: {
+  channel: string;
+  name: string | null;
+  externalId: string;
+}) {
+  const trimmed = name?.trim();
+  // اسم بلا حرف ولا رقم («.») ليس اسماً
+  const display = trimmed && /[\p{L}\p{N}]/u.test(trimmed) ? trimmed : null;
+
+  if (channel === "WEB") {
+    return <strong>{display ?? "زائر الموقع"}</strong>;
+  }
+
+  return (
+    <>
+      {display && <strong>{display}</strong>}
+      <span
+        dir="ltr"
+        style={{
+          unicodeBidi: "isolate",
+          fontVariantNumeric: "tabular-nums",
+          color: "var(--text-3)",
+          fontSize: ".92em",
+          marginInlineStart: display ? 8 : 0,
+          userSelect: "all",
+        }}
+      >
+        {channel === "WHATSAPP" ? `+${externalId}` : externalId}
+      </span>
+    </>
+  );
+}
+
 export default async function ConversationsPage({
   params,
 }: {
@@ -62,7 +110,11 @@ export default async function ConversationsPage({
       {convos.map((c) => (
         <details className="card" key={c.id}>
           <summary>
-            {c.customerName ?? c.externalUserId}{" "}
+            <Identity
+              channel={c.channel}
+              name={c.customerName}
+              externalId={c.externalUserId}
+            />{" "}
             <span className="pill">{CHANNEL_LABEL[c.channel] ?? c.channel}</span>{" "}
             <span className={`pill ${c.status === "BOT" ? "ok" : "warn"}`}>
               {c.status === "BOT" ? "الوكيل يرد" : c.status === "HUMAN" ? "محوّلة لموظف" : "مغلقة"}
