@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SUPPORT_EMAIL } from "@/lib/contact";
 
 export const metadata: Metadata = {
   title: "سياسة الخصوصية — حاضر",
@@ -124,8 +125,8 @@ export default function PrivacyPage() {
         </p>
         <p style={{ marginBottom: 0 }}>
           للاستفسارات أو طلبات البيانات:{" "}
-          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--live)" }}>
-            bashar188yousef@gmail.com
+          <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: "var(--live)" }}>
+            {SUPPORT_EMAIL}
           </a>
         </p>
       </div>
@@ -164,8 +165,8 @@ export default function PrivacyPage() {
         </p>
         <p style={{ marginBottom: 0 }}>
           <strong>Contact:</strong>{" "}
-          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--live)" }}>
-            bashar188yousef@gmail.com
+          <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: "var(--live)" }}>
+            {SUPPORT_EMAIL}
           </a>{" "}
           · <a href="/data-deletion" style={{ color: "var(--live)" }}>Data deletion</a>
         </p>

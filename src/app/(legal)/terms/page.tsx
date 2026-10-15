@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SUPPORT_EMAIL } from "@/lib/contact";
 
 export const metadata: Metadata = {
   title: "شروط الاستخدام — حاضر",
@@ -73,8 +74,8 @@ export default function TermsPage() {
       <h2>٦. التواصل</h2>
       <div className="card">
         <p style={{ margin: 0 }}>
-          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--live)" }}>
-            bashar188yousef@gmail.com
+          <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: "var(--live)" }}>
+            {SUPPORT_EMAIL}
           </a>
         </p>
       </div>

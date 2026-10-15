@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SUPPORT_EMAIL } from "@/lib/contact";
 
 export const metadata: Metadata = {
   title: "حذف البيانات — حاضر",
@@ -15,8 +16,8 @@ export default function DataDeletionPage() {
       <div className="card">
         <p style={{ marginTop: 0 }}>
           لحذف محادثاتك وأي بيانات مرتبطة بك، أرسل بريداً إلى{" "}
-          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--live)" }}>
-            bashar188yousef@gmail.com
+          <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: "var(--live)" }}>
+            {SUPPORT_EMAIL}
           </a>{" "}
           يتضمّن:
         </p>
@@ -59,8 +60,8 @@ export default function DataDeletionPage() {
       <div className="card" dir="ltr" style={{ textAlign: "left" }}>
         <p style={{ marginTop: 0 }}>
           <strong>End users:</strong> email{" "}
-          <a href="mailto:bashar188yousef@gmail.com" style={{ color: "var(--live)" }}>
-            bashar188yousef@gmail.com
+          <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: "var(--live)" }}>
+            {SUPPORT_EMAIL}
           </a>{" "}
           with the phone number or account you messaged from, the name of the business you
           contacted, and the phrase &quot;delete my data&quot;. All your conversations and
