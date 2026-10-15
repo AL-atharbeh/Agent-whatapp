@@ -284,3 +284,128 @@ export async function sendMessage(args: {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+// ═══════════════════════════════════════════════════════════
+//  القوالب — الطريق الوحيد لمراسلة رقم لم يراسلنا
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * واتساب يمنع الرسالة الحرّة خارج نافذة الأربع وعشرين ساعة.
+ *
+ * القاعدة من Meta لا منّا: ما لم يراسلنا الرقم خلال اليوم الماضي، لا يُقبل
+ * منّا إلا قالب وافقت عليه مسبقاً. الغرض منع الرسائل غير المرغوبة، والنتيجة
+ * أن «ابدأ محادثة مع عميل جديد» ليست مسألة حقل إدخال بل قالب معتمد.
+ */
+export type Template = {
+  name: string;
+  language: string;
+  category: string;
+  /** نص المتن كما اعتُمد، بعلامات {{1}} في مواضع المتغيّرات */
+  body: string;
+  /** عدد المتغيّرات التي يجب تعبئتها قبل الإرسال */
+  variables: number;
+};
+
+/** يعدّ {{1}}، {{2}} … ويرجّع أكبر رقم — لا عدد المرات، فقد يتكرر المتغيّر. */
+function countVariables(body: string): number {
+  let max = 0;
+  for (const m of body.matchAll(/\{\{\s*(\d+)\s*\}\}/g)) {
+    max = Math.max(max, Number(m[1]));
+  }
+  return max;
+}
+
+/** يملأ {{n}} بالقيم — لنخزّن في السجل ما رآه العميل، لا النص الخام. */
+export function renderTemplate(body: string, variables: string[]): string {
+  return body.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => variables[Number(n) - 1] ?? `{{${n}}}`);
+}
+
+/** القوالب المعتمدة فقط — المرفوض والمعلّق يفشل عند الإرسال، فلا نعرضه. */
+export async function listTemplates(args: {
+  wabaId: string;
+  accessToken: string;
+}): Promise<{ ok: true; templates: Template[] } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(
+      `${GRAPH()}/${args.wabaId}/message_templates` +
+        `?fields=name,status,category,language,components&limit=100`,
+      {
+        headers: { Authorization: `Bearer ${args.accessToken}` },
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+    if (!res.ok) return { ok: false, error: `Meta ${res.status}: ${await res.text()}` };
+
+    const json = (await res.json()) as {
+      data?: { name: string; status: string; category: string; language: string;
+               components?: { type: string; text?: string }[] }[];
+    };
+
+    const templates = (json.data ?? [])
+      .filter((t) => t.status === "APPROVED")
+      .map((t) => {
+        const body = t.components?.find((c) => c.type === "BODY")?.text ?? "";
+        return {
+          name: t.name,
+          language: t.language,
+          category: t.category,
+          body,
+          variables: countVariables(body),
+        };
+      });
+
+    return { ok: true, templates };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** يرسل قالباً معتمداً — المسار الوحيد لبدء محادثة مع رقم جديد. */
+export async function sendTemplate(args: {
+  accountExternalId: string;
+  to: string;
+  name: string;
+  language: string;
+  variables: string[];
+  accessToken: string;
+}): Promise<OutboundResult> {
+  const { accountExternalId, to, name, language, variables, accessToken } = args;
+
+  const payload: AnyRecord = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to,
+    type: "template",
+    template: {
+      name,
+      language: { code: language },
+      // قالب بلا متغيّرات يُرفض إن أرسلنا له components فارغة
+      ...(variables.length
+        ? {
+            components: [
+              {
+                type: "body",
+                parameters: variables.map((text) => ({ type: "text", text })),
+              },
+            ],
+          }
+        : {}),
+    },
+  };
+
+  try {
+    const res = await fetch(`${GRAPH()}/${accountExternalId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return { ok: false, error: `Meta ${res.status}: ${await res.text()}` };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

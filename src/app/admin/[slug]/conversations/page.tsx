@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { forceHandoff, replyAsHuman, resumeBot } from "../../actions";
 import { SubmitButton } from "@/components/pending";
 import { LiveRefresh } from "@/components/live";
+import { NewChat } from "./new-chat";
+import { listTemplates, type Template } from "@/lib/channels/meta";
+import { decrypt } from "@/lib/crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -74,8 +77,31 @@ export default async function ConversationsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const tenant = await prisma.tenant.findUnique({ where: { slug }, select: { id: true } });
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug },
+    select: {
+      id: true,
+      channels: {
+        where: { channel: "WHATSAPP", active: true },
+        select: { wabaId: true, accessTokenEnc: true },
+      },
+    },
+  });
   if (!tenant) notFound();
+
+  // القوالب تُقرأ من Meta لا من قاعدتنا: الاعتماد يُمنَح ويُسحَب عندهم، ونسخة
+  // محلية ستعرض يوماً قالباً صار مرفوضاً — فيفشل الإرسال بلا سبب مفهوم.
+  let templates: Template[] = [];
+  let templatesError: string | undefined;
+  const wa = tenant.channels[0];
+  if (wa?.wabaId && wa.accessTokenEnc) {
+    const res = await listTemplates({
+      wabaId: wa.wabaId,
+      accessToken: decrypt(wa.accessTokenEnc),
+    });
+    if (res.ok) templates = res.templates;
+    else templatesError = res.error;
+  }
 
   const convos = await prisma.conversation.findMany({
     where: { tenantId: tenant.id },
@@ -104,6 +130,8 @@ export default async function ConversationsPage({
         <h2 style={{ margin: 0 }}>المحادثات ({convos.length})</h2>
         <LiveRefresh slug={slug} />
       </div>
+
+      <NewChat slug={slug} templates={templates} error={templatesError} />
 
       {convos.length === 0 && <div className="card">لا يوجد محادثات بعد.</div>}
 
