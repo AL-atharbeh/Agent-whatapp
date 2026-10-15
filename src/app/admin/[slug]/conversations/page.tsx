@@ -4,6 +4,7 @@ import { forceHandoff, replyAsHuman, resumeBot } from "../../actions";
 import { SubmitButton } from "@/components/pending";
 import { LiveRefresh } from "@/components/live";
 import { NewChat } from "./new-chat";
+import { NewTemplate } from "./new-template";
 import { listTemplates, type Template } from "@/lib/channels/meta";
 import { decrypt } from "@/lib/crypto";
 
@@ -132,6 +133,7 @@ export default async function ConversationsPage({
       </div>
 
       <NewChat slug={slug} templates={templates} error={templatesError} />
+      <NewTemplate slug={slug} />
 
       {convos.length === 0 && <div className="card">لا يوجد محادثات بعد.</div>}
 

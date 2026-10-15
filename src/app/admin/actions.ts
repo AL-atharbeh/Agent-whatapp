@@ -10,6 +10,7 @@ import { normalizeArabic } from "@/lib/arabic";
 import { ALL_CHANNELS, getPlan, planAllowsChannel } from "@/lib/plans";
 import { decrypt, encrypt } from "@/lib/crypto";
 import {
+  createTemplate,
   listTemplates,
   renderTemplate,
   sendMessage,
@@ -707,6 +708,70 @@ export async function startConversation(formData: FormData) {
       data: { status: "HUMAN", lastMessageAt: new Date() },
     }),
   ]);
+
+  revalidatePath(`/admin/${slug}/conversations`);
+}
+
+/**
+ * ينشئ قالب رسالة ويرسله لمراجعة Meta.
+ *
+ * القوالب شرط لمخاطبة رقم خارج نافذة الأربع وعشرين ساعة، وكان إنشاؤها
+ * يتطلب فتح مدير Meta. ذلك مقبول حين ندير متجراً واحداً، ومستحيل حين يصير
+ * لكل متجر قوالبه — لا يُعقَل أن يفتح صاحب محل لوحة Meta ليكتب جملة ترحيب،
+ * ولا أن نكتبها نحن عن كل عميل.
+ */
+export async function newTemplate(formData: FormData) {
+  const slug = s(formData.get("slug"))!;
+  const name = s(formData.get("name"));
+  const body = s(formData.get("body"));
+  const category = s(formData.get("category")) === "MARKETING" ? "MARKETING" : "UTILITY";
+  const language = s(formData.get("language")) ?? "ar";
+  const footer = s(formData.get("footer")) ?? undefined;
+
+  if (!name) throw new Error("اكتب اسماً للقالب");
+  if (!body) throw new Error("اكتب متن الرسالة");
+
+  // Meta تقبل الحروف الصغيرة والأرقام والشرطة السفلية فقط
+  if (!/^[a-z0-9_]{1,512}$/.test(name)) {
+    throw new Error(
+      `اسم غير صالح: "${name}" — حروف إنجليزية صغيرة وأرقام وشرطة سفلية فقط، مثل: tawasol_awwali`,
+    );
+  }
+
+  const tenantId = await authorizeTenant(slug);
+  const account = await prisma.channelAccount.findFirst({
+    where: { tenantId, channel: "WHATSAPP", active: true },
+    select: { wabaId: true, accessTokenEnc: true },
+  });
+  if (!account?.wabaId || !account.accessTokenEnc) {
+    throw new Error("لا توجد قناة واتساب مكتملة — راجع إعدادات القنوات");
+  }
+
+  // عدد المتغيّرات من المتن نفسه، لا من عدد الحقول المعبّأة: حقل متروك
+  // فارغاً وسط القائمة يجعل القيم تنزلق فيحمل {{2}} مثال {{3}}.
+  let needed = 0;
+  for (const m of body.matchAll(/\{\{\s*(\d+)\s*\}\}/g)) {
+    needed = Math.max(needed, Number(m[1]));
+  }
+  const examples: string[] = [];
+  const given = formData.getAll("example").map((v) => v.toString().trim());
+  for (let i = 0; i < needed; i++) {
+    const v = given[i];
+    if (!v) throw new Error(`اكتب قيمة مثال للمتغيّر {{${i + 1}}} — Meta ترفض القالب بدونها`);
+    examples.push(v);
+  }
+
+  const res = await createTemplate({
+    wabaId: account.wabaId,
+    name,
+    language,
+    category,
+    body,
+    footer,
+    examples,
+    accessToken: decrypt(account.accessTokenEnc),
+  });
+  if (!res.ok) throw new Error(`رفضت Meta القالب: ${res.error}`);
 
   revalidatePath(`/admin/${slug}/conversations`);
 }

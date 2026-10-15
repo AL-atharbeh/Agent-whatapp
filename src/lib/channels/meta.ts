@@ -409,3 +409,64 @@ export async function sendTemplate(args: {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+/**
+ * ينشئ قالباً ويرسله لمراجعة Meta.
+ *
+ * كان إنشاء القوالب يتم في مدير Meta وحده. ذلك ممكن لمتجر واحد نديره نحن،
+ * ومستحيل حين يصير لكل متجر قوالبه: لا يُعقَل أن يفتح صاحب محل لوحة Meta
+ * ليكتب جملة ترحيب.
+ *
+ * و`example` ليست تجميلاً: Meta ترفض فوراً أي قالب فيه متغيّر بلا قيمة
+ * مثال، لأن المراجع يحتاج أن يرى الجملة مكتملة ليحكم عليها.
+ */
+export async function createTemplate(args: {
+  wabaId: string;
+  name: string;
+  language: string;
+  category: "UTILITY" | "MARKETING";
+  body: string;
+  footer?: string;
+  /** قيمة مثال لكل {{n}} بالترتيب */
+  examples: string[];
+  accessToken: string;
+}): Promise<{ ok: true; id: string; status: string } | { ok: false; error: string }> {
+  const { wabaId, name, language, category, body, footer, examples, accessToken } = args;
+
+  const components: AnyRecord[] = [
+    {
+      type: "BODY",
+      text: body,
+      // قالب بلا متغيّرات يُرفض إن أرسلنا له example فارغاً
+      ...(examples.length ? { example: { body_text: [examples] } } : {}),
+    },
+  ];
+  if (footer?.trim()) components.push({ type: "FOOTER", text: footer.trim() });
+
+  try {
+    const res = await fetch(`${GRAPH()}/${wabaId}/message_templates`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name, language, category, components }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    const json = (await res.json()) as {
+      id?: string;
+      status?: string;
+      error?: { error_user_msg?: string; message?: string };
+    };
+
+    if (!res.ok) {
+      // Meta تعطي رسالة موجّهة للمستخدم حين تملكها — وهي أوضح من رمز الخطأ
+      const msg = json.error?.error_user_msg ?? json.error?.message ?? `Meta ${res.status}`;
+      return { ok: false, error: msg };
+    }
+    return { ok: true, id: json.id ?? "", status: json.status ?? "PENDING" };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
