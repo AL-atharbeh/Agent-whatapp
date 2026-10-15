@@ -13,7 +13,8 @@
     "verify": "tsx scripts/verify-isolation.ts",
     "admin": "tsx --env-file=.env scripts/create-admin.ts",
     "password": "tsx --env-file=.env scripts/reset-password.ts",
-    "seed:plans": "tsx --env-file=.env scripts/seed-plans.ts"
+    "seed:plans": "tsx --env-file=.env scripts/seed-plans.ts",
+    "owner": "tsx --env-file=.env scripts/create-owner.ts"
   },
   "prisma": {
     "seed": "tsx scripts/seed.ts"
