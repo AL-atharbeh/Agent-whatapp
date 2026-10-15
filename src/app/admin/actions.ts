@@ -10,6 +10,7 @@ import { normalizeArabic } from "@/lib/arabic";
 import { ALL_CHANNELS, getPlan, planAllowsChannel } from "@/lib/plans";
 import { decrypt, encrypt } from "@/lib/crypto";
 import {
+  checkTemplateBody,
   createTemplate,
   listTemplates,
   renderTemplate,
@@ -26,6 +27,27 @@ import {
  *
  * الإجراءات الحسّاسة (إنشاء/حذف متجر، القنوات، التفعيل) محصورة بـ requireAdmin.
  */
+
+/**
+ * ينقل سبب الفشل إلى المستخدم بدل صفحة «صار خطأ في الخادم».
+ *
+ * الإجراءات ترمي رسائل عربية دقيقة، وNext.js تحجب نصّها في الإنتاج وتعرض
+ * صفحة عامة برقم معرّف. فيرى صاحب المتجر عطلاً حيث كان شرطاً لم يستوفِه،
+ * ويعيد المحاولة بنفس المُدخَل — والرسالة المكتوبة له في سجلّ لا يقرأه.
+ *
+ * فنلتقطها هنا ونعيد التوجيه حاملين إياها، ويعرضها <ActionError/>.
+ *
+ * و`redirect` نفسه يعمل برمي استثناء يحمل digest يبدأ بـ NEXT_ — فابتلاعه
+ * هنا يكسر كل تحويل مقصود، لذا نمرّره كما هو.
+ */
+function report(err: unknown, path: string): never {
+  const digest = (err as { digest?: string })?.digest;
+  if (typeof digest === "string" && digest.startsWith("NEXT_")) throw err;
+
+  const msg = err instanceof Error ? err.message : "صار خطأ غير متوقّع";
+  console.error("[action]", msg);
+  redirect(`${path}?err=${encodeURIComponent(msg)}`);
+}
 
 const s = (v: FormDataEntryValue | null) => {
   const t = v?.toString().trim();
@@ -514,7 +536,7 @@ export async function revokeVoiceToken(formData: FormData) {
  * يُرسل عبر نفس القناة التي جاء منها العميل، ويُحفظ بدور HUMAN فيتميّز في
  * السجل عن رد الوكيل.
  */
-export async function replyAsHuman(formData: FormData) {
+async function replyAsHumanRaw(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const id = s(formData.get("id"))!;
   const text = s(formData.get("text"));
@@ -638,7 +660,7 @@ function normalizePhone(raw: string, locale: string): string {
  * والمحادثة تُفتح بحالة HUMAN عمداً: نحن من بدأها، فردّ العميل الأول جواب
  * على كلامنا لا سؤال جديد — ولو تركناها للوكيل لردّ على سياق لا يعرفه.
  */
-export async function startConversation(formData: FormData) {
+async function startConversationRaw(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const rawPhone = s(formData.get("phone"));
   const templateName = s(formData.get("template"));
@@ -720,7 +742,7 @@ export async function startConversation(formData: FormData) {
  * لكل متجر قوالبه — لا يُعقَل أن يفتح صاحب محل لوحة Meta ليكتب جملة ترحيب،
  * ولا أن نكتبها نحن عن كل عميل.
  */
-export async function newTemplate(formData: FormData) {
+async function newTemplateRaw(formData: FormData) {
   const slug = s(formData.get("slug"))!;
   const name = s(formData.get("name"));
   const body = s(formData.get("body"));
@@ -730,6 +752,11 @@ export async function newTemplate(formData: FormData) {
 
   if (!name) throw new Error("اكتب اسماً للقالب");
   if (!body) throw new Error("اكتب متن الرسالة");
+
+  // قواعد Meta تُفحَص هنا لا هناك: الرفض عندهم يأتي بعد انتظار، بالإنجليزية،
+  // عن قاعدة لم يقرأها أحد — وهي قواعد نعرفها مسبقاً.
+  const bad = checkTemplateBody(body);
+  if (bad) throw new Error(bad);
 
   // Meta تقبل الحروف الصغيرة والأرقام والشرطة السفلية فقط
   if (!/^[a-z0-9_]{1,512}$/.test(name)) {
@@ -774,4 +801,31 @@ export async function newTemplate(formData: FormData) {
   if (!res.ok) throw new Error(`رفضت Meta القالب: ${res.error}`);
 
   revalidatePath(`/admin/${slug}/conversations`);
+}
+
+
+
+
+export async function newTemplate(formData: FormData) {
+  try {
+    await newTemplateRaw(formData);
+  } catch (err) {
+    report(err, `/admin/${formData.get("slug")}/conversations`);
+  }
+}
+
+export async function startConversation(formData: FormData) {
+  try {
+    await startConversationRaw(formData);
+  } catch (err) {
+    report(err, `/admin/${formData.get("slug")}/conversations`);
+  }
+}
+
+export async function replyAsHuman(formData: FormData) {
+  try {
+    await replyAsHumanRaw(formData);
+  } catch (err) {
+    report(err, `/admin/${formData.get("slug")}/conversations`);
+  }
 }

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { forceHandoff, replyAsHuman, resumeBot } from "../../actions";
@@ -5,6 +6,7 @@ import { SubmitButton } from "@/components/pending";
 import { LiveRefresh } from "@/components/live";
 import { NewChat } from "./new-chat";
 import { NewTemplate } from "./new-template";
+import { ActionError } from "@/components/action-error";
 import { listTemplates, type Template } from "@/lib/channels/meta";
 import { decrypt } from "@/lib/crypto";
 
@@ -116,6 +118,10 @@ export default async function ConversationsPage({
 
   return (
     <>
+      <Suspense fallback={null}>
+        <ActionError />
+      </Suspense>
+
       <div className="card">
         <h3>سجل كامل وقابل للتدقيق</h3>
         <p className="hint" style={{ margin: 0 }}>

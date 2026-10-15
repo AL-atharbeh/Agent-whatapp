@@ -96,7 +96,8 @@ export function NewTemplate({ slug }: { slug: string }) {
           </label>
           <p className="hint" style={{ marginTop: -6 }}>
             اكتب <code>{"{{1}}"}</code> و <code>{"{{2}}"}</code> مكان ما يتغيّر
-            من عميل لآخر.
+            من عميل لآخر. وقاعدتان من Meta: <strong>لا تبدأ ولا تنتهِ بمتغيّر</strong>،
+            وكل متغيّر يحتاج نصاً حوله — متغيّران في سطر قصير يُرفضان.
           </p>
 
           {Array.from({ length: count }, (_, i) => (

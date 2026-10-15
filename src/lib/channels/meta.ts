@@ -470,3 +470,44 @@ export async function createTemplate(args: {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+/**
+ * قواعد Meta لمتن القالب — نفحصها قبل الإرسال.
+ *
+ * الرفض عند Meta يأتي بعد رحلة كاملة: يكتب صاحب المتجر النص، ويرسل، وينتظر،
+ * ثم يصله خطأ بالإنجليزية عن قاعدة لم يقرأها أحد. وهي قواعد بسيطة نعرفها
+ * مسبقاً، فمكانها هنا — قبل الإرسال — لا هناك.
+ *
+ * القاعدتان مستخرجتان من رفض فعلي، لا من الوثائق:
+ *   «Variables can't be at the start or end of the template»
+ *   «This template has too many variables for its length»
+ */
+export function checkTemplateBody(body: string): string | null {
+  const text = body.trim();
+  if (!text) return "اكتب متن الرسالة";
+
+  if (/^\{\{\s*\d+\s*\}\}/.test(text)) {
+    return "المتن لا يبدأ بمتغيّر — ابدأ بكلمة ترحيب ثم ضع {{1}}";
+  }
+  if (/\{\{\s*\d+\s*\}\}[\s.،!؟]*$/.test(text)) {
+    return "المتن لا ينتهي بمتغيّر — أضف جملة بعده، مثل «— رح نرد عليك قريباً»";
+  }
+
+  /**
+   * Meta ترفض كثرة المتغيّرات بالنسبة للطول، ولا تعلن النسبة. قسناها
+   * بالتجربة على حسابنا: رُفض نصّان عند ٧ و٨ حروف صافية لكل متغيّر، وقُبل
+   * نصّان عند ١٦ و٤١. فالحدّ بينهما.
+   *
+   * ونميل للتساهل عمداً: حدٌّ أضيق من حدّ Meta يمنع قالباً كانت ستقبله،
+   * وهذا أسوأ من رفضٍ منها — لأن المستخدم حينها لا يملك طريقاً إلى الأمام.
+   * ورسالة Meta تصله الآن كما هي، فهي المرجع الأخير لا نحن.
+   */
+  let vars = 0;
+  for (const m of text.matchAll(/\{\{\s*(\d+)\s*\}\}/g)) vars = Math.max(vars, Number(m[1]));
+  const plain = text.replace(/\{\{\s*\d+\s*\}\}/g, "").trim().length;
+  if (vars > 0 && plain < vars * 12) {
+    return `النص قصير على ${vars} متغيّر${vars > 2 ? "ات" : "ين"} — أضف كلمات، أو قلّل المتغيّرات`;
+  }
+
+  return null;
+}
