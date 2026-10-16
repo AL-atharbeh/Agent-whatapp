@@ -11,6 +11,10 @@ import { SESSION_COOKIE, readSession } from "@/lib/auth";
  * مفتوح عمداً: /api/webhooks/* (تناديه Meta بتوقيعها الخاص) و /api/health
  * والصفحات القانونية (يفتحها مراجعو Meta بلا حساب).
  *
+ * و /api/mobile/* خارج المطابقة عمداً: الجوال لا يحمل كوكي، ولو مرّ من هنا
+ * لحُوِّل كل طلب منه إلى صفحة الدخول بالـ HTML. حارسه requireDevice في
+ * lib/mobile/auth.ts — رمز جهاز في القاعدة، لا توقيع الكوكي.
+ *
  * ⚠️ هذا الحارس للمسارات فقط. server actions تُفحص في lib/session.ts.
  */
 

@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import type { Channel } from "@prisma/client";
-import type { InboundMessage, OutboundResult } from "./types";
+import { failureKind, type InboundMessage, type OutboundResult } from "./types";
 
 const GRAPH = () =>
   `https://graph.facebook.com/${process.env.META_GRAPH_VERSION ?? "v21.0"}`;
@@ -277,11 +277,16 @@ export async function sendMessage(args: {
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) {
-      return { ok: false, error: `Meta ${res.status}: ${await res.text()}` };
+      return {
+        ok: false,
+        kind: failureKind(res.status),
+        error: `Meta ${res.status}: ${await res.text().catch(() => "")}`,
+      };
     }
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    // مهلة أو انقطاع: ربما وصل الطلب Meta وقُبل قبل أن ينقطع الرد
+    return { ok: false, kind: "unknown", error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -403,10 +408,16 @@ export async function sendTemplate(args: {
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(15000),
     });
-    if (!res.ok) return { ok: false, error: `Meta ${res.status}: ${await res.text()}` };
+    if (!res.ok) {
+      return {
+        ok: false,
+        kind: failureKind(res.status),
+        error: `Meta ${res.status}: ${await res.text().catch(() => "")}`,
+      };
+    }
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return { ok: false, kind: "unknown", error: err instanceof Error ? err.message : String(err) };
   }
 }
 

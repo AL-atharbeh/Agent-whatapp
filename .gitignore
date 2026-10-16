@@ -8,3 +8,8 @@ next-env.d.ts
 tsconfig.tsbuildinfo
 .vercel
 .env.vercel
+
+# مفاتيح خاصة — لا تُرفع أبداً. ملف Admin SDK يعطي صلاحية كاملة على مشروع
+# Firebase، ومفتاح APNs (.p8) يرسل إشعارات باسم تطبيقنا لأي جهاز.
+*firebase-adminsdk*.json
+*.p8

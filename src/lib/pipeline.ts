@@ -6,6 +6,7 @@ import { CapacityError } from "./agent/providers/types";
 import { downloadAudio, sendAudio, sendMessage } from "./channels/meta";
 import { MAX_TTS_CHARS, synthesize, transcribe } from "./speech";
 import type { InboundMessage } from "./channels/types";
+import { schedulePush } from "./mobile/push";
 import {
   loadTenantById,
   resolveTenantByChannelAccount,
@@ -131,6 +132,23 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
       externalId: msg.externalMessageId,
     });
 
+    // الإشعار بعد التخزين لا قبله: لو سبقه، فتح الموظف المحادثة من الإشعار
+    // فلم يجد الرسالة التي نُبّه إليها. ومُجدوَل لا منتظَر — بطء FCM لا
+    // يؤخّر رد الوكيل، وفشله لا يصل إلى هنا.
+    schedulePush({ tenantId: tenant.id, type: "message", conversation: convo, text: storedText });
+
+    /**
+     * كل تحويل يمر من هنا ليُشعَر الموظف.
+     *
+     * التحويل هو اللحظة التي يصمت فيها الوكيل وينتظر العميل إنساناً. خمسة
+     * مسارات تحوّل (كلمة، سقف، سعة، عطل، قرار الوكيل)، ونسيان الإشعار في
+     * واحد منها يعني عميلاً معلّقاً لا يعلم به أحد حتى يفتح اللوحة.
+     */
+    const handoff = async (reason: string) => {
+      await scope.handoff(convo.id, reason);
+      schedulePush({ tenantId: tenant.id, type: "handoff", conversation: convo, text: reason });
+    };
+
     // 3) المحادثة محوّلة لموظف بشري ⇒ الوكيل يصمت تماماً.
     if (convo.status === "HUMAN") return;
 
@@ -177,7 +195,7 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
     const lowered = userText.toLowerCase();
     const hit = tenant.handoffKeywords.find((k) => lowered.includes(k.toLowerCase()));
     if (hit) {
-      await scope.handoff(convo.id, `كلمة مفتاحية: ${hit}`);
+      await handoff(`كلمة مفتاحية: ${hit}`);
       await reply("تمام، رح أحوّلك لأحد الزملاء يتواصل معك حالاً 🙏");
       return;
     }
@@ -194,7 +212,7 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
 
     // 6) سقف الحماية اليومي
     if ((await scope.repliesToday()) >= tenant.maxRepliesPerDay) {
-      await scope.handoff(convo.id, "تجاوز السقف اليومي للردود");
+      await handoff("تجاوز السقف اليومي للردود");
       console.warn("[pipeline] تجاوز السقف اليومي:", tenant.slug);
       return;
     }
@@ -220,15 +238,14 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
       // حصّته عند المزوّد هي ما ضاقت — وهو الشيء الوحيد الذي يملك إصلاحه.
       if (err instanceof CapacityError) {
         console.warn(`[pipeline] نفاد سعة المزوّد — ${tenant.slug}: ${err.message}`);
-        await scope.handoff(
-          convo.id,
+        await handoff(
           `نفاد سعة المزوّد (${err.retryAfterSeconds ?? "؟"} ثانية حتى التجديد) — ارفع حصّة المزوّد`,
         );
         await reply(AT_CAPACITY_REPLY);
         return;
       }
       console.error("[pipeline] فشل الوكيل:", err);
-      await scope.handoff(convo.id, "خطأ تقني في الوكيل");
+      await handoff("خطأ تقني في الوكيل");
       await reply("صار عندي خلل بسيط، رح يتواصل معك أحد الزملاء 🙏");
       return;
     }
@@ -242,7 +259,7 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
     });
 
     if (result.handoff?.requested) {
-      await scope.handoff(convo.id, result.handoff.reason);
+      await handoff(result.handoff.reason);
     }
 
     await deliver(tenant.id, msg, result.reply, speak);

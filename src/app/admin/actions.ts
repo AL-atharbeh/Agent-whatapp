@@ -9,14 +9,13 @@ import { authorizeTenant, getSession, requireAdmin } from "@/lib/session";
 import { normalizeArabic } from "@/lib/arabic";
 import { ALL_CHANNELS, getPlan, planAllowsChannel } from "@/lib/plans";
 import { decrypt, encrypt } from "@/lib/crypto";
+import { checkTemplateBody, createTemplate } from "@/lib/channels/meta";
 import {
-  checkTemplateBody,
-  createTemplate,
-  listTemplates,
-  renderTemplate,
-  sendMessage,
-  sendTemplate,
-} from "@/lib/channels/meta";
+  OutboundError,
+  sendHumanReply,
+  startWhatsappConversation,
+  webErrorMessage,
+} from "@/lib/outbound";
 
 /**
  * إجراءات إدارة المتاجر — يستخدمها مالك المنصة وأصحاب المتاجر معاً.
@@ -44,7 +43,12 @@ function report(err: unknown, path: string): never {
   const digest = (err as { digest?: string })?.digest;
   if (typeof digest === "string" && digest.startsWith("NEXT_")) throw err;
 
-  const msg = err instanceof Error ? err.message : "صار خطأ غير متوقّع";
+  const msg =
+    err instanceof OutboundError
+      ? webErrorMessage(err)
+      : err instanceof Error
+        ? err.message
+        : "صار خطأ غير متوقّع";
   console.error("[action]", msg);
   redirect(`${path}?err=${encodeURIComponent(msg)}`);
 }
@@ -545,53 +549,16 @@ async function replyAsHumanRaw(formData: FormData) {
 
   const tenantId = await authorizeTenant(slug);
 
-  // استعلام واحد يجلب المحادثة وقناتها معاً بدل اثنين متتاليين: كل جولة
-  // إلى قاعدة بعيدة تُضاف مباشرةً إلى الزمن الذي ينتظره الموظف.
-  const convo = await prisma.conversation.findUniqueOrThrow({
-    where: { id, tenantId },
-    select: {
-      channel: true,
-      externalUserId: true,
-      tenant: {
-        select: {
-          channels: {
-            where: { active: true },
-            select: { channel: true, externalId: true, accessTokenEnc: true },
-          },
-        },
-      },
-    },
-  });
-
-  if (convo.channel === "WEB") {
-    throw new Error("محادثات التجربة لا تُرسل — هي ساحة اختبار لا قناة حقيقية");
-  }
-
-  const account = convo.tenant.channels.find((c) => c.channel === convo.channel);
-  if (!account?.accessTokenEnc) {
-    throw new Error("لا يوجد رمز وصول لهذه القناة — راجع إعدادات القنوات");
-  }
-
-  const res = await sendMessage({
-    channel: convo.channel,
-    accountExternalId: account.externalId,
-    to: convo.externalUserId,
+  // المسار نفسه الذي يستخدمه الجوال (lib/outbound) — بلا فحص نافذة ولا
+  // استلام تلقائي، فسلوك اللوحة كما كان: Meta هي من ترفض خارج النافذة،
+  // والاستلام بزرّه.
+  await sendHumanReply({
+    tenantId,
+    conversationId: id,
     text,
-    accessToken: decrypt(account.accessTokenEnc),
+    enforceWindow: false,
+    claim: null,
   });
-  // لا نحفظ ما لم يُرسَل: سجل يُظهر رسالة لم تصل العميل أسوأ من لا سجل
-  if (!res.ok) throw new Error(`فشل الإرسال: ${res.error}`);
-
-  // الكتابتان معاً في جولة واحدة
-  await prisma.$transaction([
-    prisma.message.create({
-      data: { tenantId, conversationId: id, role: "HUMAN", text },
-    }),
-    prisma.conversation.update({
-      where: { id, tenantId },
-      data: { lastMessageAt: new Date() },
-    }),
-  ]);
 
   // المسار الذي يراه الموظف الآن فقط — الآخر يلتقط التغيير بنبضته
   revalidatePath(`/admin/${slug}/conversations`);
@@ -617,48 +584,9 @@ export async function forceHandoff(formData: FormData) {
   revalidatePath(`/admin/${slug}/conversations`);
 }
 
-/** مفاتيح الاتصال — تُشتق من لهجة المتجر، فالرقم المحلي لا يحمل بلده. */
-const DIALING_CODE: Record<string, string> = {
-  JO: "962", SA: "966", AE: "971", KW: "965", QA: "974", BH: "973", OM: "968",
-  EG: "20", IQ: "964", LB: "961", SY: "963", PS: "970", YE: "967",
-  LY: "218", SD: "249", MA: "212", DZ: "213", TN: "216",
-};
-
 /**
- * يحوّل ما يكتبه الموظف إلى الصيغة التي يقبلها واتساب: أرقام فقط بمفتاح الدولة.
- *
- * الموظف ينسخ الرقم من حيث وجده — `+962 7 7046 6649`، `0096277…`، `0777…` —
- * وكلها نفس الرقم وكلها تُرفض كما هي. ورفضٌ بسبب شَرطة واحدة يبدو عطلاً في
- * النظام لا خطأً في اللصق، فنقبل الصيغ كلها ونوحّدها هنا.
- *
- * ويبقى حدّ واحد لا نتجاوزه: رقم محلي (`07…`) من متجر لا نعرف مفتاح بلده
- * نرفضه بدل أن نخمّن — إرساله لبلد خاطئ يصل إلى شخص حقيقي آخر.
- */
-function normalizePhone(raw: string, locale: string): string {
-  let d = raw.replace(/[^\d+]/g, "");
-  if (d.startsWith("+")) return d.slice(1);
-  if (d.startsWith("00")) return d.slice(2);
-  if (!d.startsWith("0")) return d;
-
-  const region = locale.split("-")[1]?.toUpperCase() ?? "";
-  const code = DIALING_CODE[region];
-  if (!code) {
-    throw new Error(
-      `اكتب الرقم بمفتاح الدولة (مثل 9627XXXXXXXX) — لا نعرف مفتاح بلد هذا المتجر`,
-    );
-  }
-  return code + d.slice(1);
-}
-
-/**
- * يبدأ محادثة مع رقم لم يراسلنا.
- *
- * لا يمكن أن تكون رسالة حرّة: واتساب يقبل خارج نافذة الأربع وعشرين ساعة
- * قوالب معتمدة فقط. فنرسل القالب، ثم نخزّن نصّه **بعد تعبئة متغيّراته** —
- * لأن ما يجب أن يقرأه الموظف في السجل هو ما رآه العميل، لا `{{1}}`.
- *
- * والمحادثة تُفتح بحالة HUMAN عمداً: نحن من بدأها، فردّ العميل الأول جواب
- * على كلامنا لا سؤال جديد — ولو تركناها للوكيل لردّ على سياق لا يعرفه.
+ * يبدأ محادثة مع رقم لم يراسلنا — بقالب معتمد، ثم تُفتح بحالة HUMAN.
+ * المنطق كله في lib/outbound مشتركاً مع الجوال؛ هنا قراءة النموذج فقط.
  */
 async function startConversationRaw(formData: FormData) {
   const slug = s(formData.get("slug"))!;
@@ -670,66 +598,21 @@ async function startConversationRaw(formData: FormData) {
 
   const tenantId = await authorizeTenant(slug);
 
-  const tenant = await prisma.tenant.findUniqueOrThrow({
-    where: { id: tenantId },
-    select: {
-      locale: true,
-      channels: {
-        where: { channel: "WHATSAPP", active: true },
-        select: { externalId: true, wabaId: true, accessTokenEnc: true },
-      },
-    },
-  });
-
-  const account = tenant.channels[0];
-  if (!account?.accessTokenEnc) {
-    throw new Error("لا توجد قناة واتساب مفعّلة — راجع إعدادات القنوات");
-  }
-
-  const to = normalizePhone(rawPhone, tenant.locale);
-  if (to.length < 8 || to.length > 15) {
-    throw new Error(`رقم غير صالح: ${rawPhone} — اكتبه بمفتاح الدولة، مثل 9627XXXXXXXX`);
-  }
-
-  const accessToken = decrypt(account.accessTokenEnc);
   const [name, language] = templateName.split("|");
   const variables = formData
     .getAll("var")
     .map((v) => v.toString().trim())
     .filter(Boolean);
 
-  const found = await listTemplates({ wabaId: account.wabaId!, accessToken });
-  if (!found.ok) throw new Error(`تعذّر قراءة القوالب: ${found.error}`);
-  const tpl = found.templates.find((t) => t.name === name && t.language === language);
-  if (!tpl) throw new Error("القالب لم يعد معتمداً — حدّث الصفحة");
-  if (variables.length < tpl.variables) {
-    throw new Error(`القالب يحتاج ${tpl.variables} متغيّراً، وصلني ${variables.length}`);
-  }
-
-  const res = await sendTemplate({
-    accountExternalId: account.externalId,
-    to,
+  await startWhatsappConversation({
+    tenantId,
+    phone: rawPhone,
+    customerName,
     name,
-    language,
-    variables: variables.slice(0, tpl.variables),
-    accessToken,
+    language: language ?? "",
+    variables,
+    claimReason: null,
   });
-  // لا نفتح محادثة لرسالة لم تصل: سجل يُظهر ما لم يُرسَل أسوأ من لا سجل
-  if (!res.ok) throw new Error(`فشل الإرسال: ${res.error}`);
-
-  const text = renderTemplate(tpl.body, variables);
-  const scope = tenantScope(tenantId);
-  const convo = await scope.getOrCreateConversation("WHATSAPP", to, customerName ?? undefined);
-
-  await prisma.$transaction([
-    prisma.message.create({
-      data: { tenantId, conversationId: convo.id, role: "HUMAN", text },
-    }),
-    prisma.conversation.update({
-      where: { id: convo.id, tenantId },
-      data: { status: "HUMAN", lastMessageAt: new Date() },
-    }),
-  ]);
 
   revalidatePath(`/admin/${slug}/conversations`);
 }

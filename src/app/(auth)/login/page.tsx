@@ -7,10 +7,16 @@ import { SubmitButton } from "@/components/pending";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "تسجيل الدخول" };
 
+/** الدقائق من الرابط — رقم صغير فقط، فالرابط يُنسَخ ويُعدَّل باليد. */
+const waitMinutes = (v?: string) => {
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 1 && n <= 15 ? n : 15;
+};
+
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; next?: string; registered?: string }>;
+  searchParams: Promise<{ error?: string; next?: string; registered?: string; wait?: string }>;
 }) {
   const sp = await searchParams;
 
@@ -62,7 +68,9 @@ export default async function LoginPage({
 
             {sp.error && (
               <p className="hint" style={{ color: "var(--danger)", marginBottom: 16 }}>
-                البريد أو كلمة السر غير صحيحة.
+                {sp.error === "rate"
+                  ? `محاولات دخول كثيرة — جرّب بعد ${waitMinutes(sp.wait)} دقيقة.`
+                  : "البريد أو كلمة السر غير صحيحة."}
               </p>
             )}
 

@@ -9,6 +9,8 @@ import { NewTemplate } from "./new-template";
 import { ActionError } from "@/components/action-error";
 import { listTemplates, type Template } from "@/lib/channels/meta";
 import { decrypt } from "@/lib/crypto";
+import { displayId, displayName } from "@/lib/display";
+import type { Channel } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -42,13 +44,12 @@ function Identity({
   name,
   externalId,
 }: {
-  channel: string;
+  channel: Channel;
   name: string | null;
   externalId: string;
 }) {
-  const trimmed = name?.trim();
-  // اسم بلا حرف ولا رقم («.») ليس اسماً
-  const display = trimmed && /[\p{L}\p{N}]/u.test(trimmed) ? trimmed : null;
+  // نفس القاعدة التي يعرض بها الجوال الاسم — موضع واحد في lib/display
+  const display = displayName(name);
 
   if (channel === "WEB") {
     return <strong>{display ?? "زائر الموقع"}</strong>;
@@ -68,7 +69,7 @@ function Identity({
           userSelect: "all",
         }}
       >
-        {channel === "WHATSAPP" ? `+${externalId}` : externalId}
+        {displayId(channel, externalId)}
       </span>
     </>
   );

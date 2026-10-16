@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import {
@@ -10,6 +10,8 @@ import {
   isValidEmail,
   verifyPassword,
 } from "@/lib/auth";
+import { DUMMY_HASH, LoginRateLimited, beginLogin, loginSucceeded } from "@/lib/login-guard";
+import { clientIpKey } from "@/lib/ip";
 
 const str = (v: FormDataEntryValue | null) => v?.toString().trim() ?? "";
 
@@ -37,15 +39,37 @@ export async function login(formData: FormData) {
   const password = str(formData.get("password"));
   const next = str(formData.get("next"));
 
-  const fail = () =>
-    redirect(`/login?error=1${next ? `&next=${encodeURIComponent(next)}` : ""}`);
+  const keep = next ? `&next=${encodeURIComponent(next)}` : "";
+  const fail = () => redirect(`/login?error=1${keep}`);
 
   if (!email || !password) fail();
 
+  /**
+   * نفس الحارس ونفس العدّاد الذي يستعمله الجوال (lib/login-guard.ts).
+   *
+   * كانت صفحة الدخول بلا حدّ إطلاقاً: خمس محاولات على الجوال ثم ما لا
+   * نهاية له هنا، فحماية الجوال كانت شكلية.
+   */
+  let ticket;
+  try {
+    ticket = await beginLogin(email, clientIpKey(await headers()));
+  } catch (err) {
+    if (err instanceof LoginRateLimited) {
+      const wait = Math.max(1, Math.ceil(err.retryAfterSeconds / 60));
+      redirect(`/login?error=rate&wait=${wait}${keep}`);
+    }
+    throw err;
+  }
+
   const user = await prisma.user.findUnique({ where: { email } });
 
-  // رسالة واحدة للحالتين: لا نكشف أي بريد مسجَّل وأيها لا
-  if (!user || !(await verifyPassword(password, user.passwordHash))) fail();
+  // رسالة واحدة للحالتين: لا نكشف أي بريد مسجَّل وأيها لا. وبريد غير
+  // موجود يمر بـ PBKDF2 كاملاً على هاش وهمي — كان يرجع فوراً، فيكشف زمنُ
+  // الرد وحده أيّ البُرُد مسجَّلة.
+  const ok = await verifyPassword(password, user?.passwordHash ?? DUMMY_HASH);
+  if (!user || !ok) fail();
+
+  await loginSucceeded(ticket);
 
   await prisma.user.update({
     where: { id: user!.id },

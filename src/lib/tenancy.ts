@@ -195,6 +195,20 @@ export function tenantScope(tenantId: string) {
       return rows.reverse();
     },
 
+    /**
+     * يخزّن الرسالة ويحرّك وقتَي المحادثة في معاملة واحدة.
+     *
+     * كان lastMessageAt يتحرّك مع الوارد فقط (في getOrCreateConversation)،
+     * فرد الوكيل لا يرفع المحادثة في القائمة. والأهم lastInboundAt: منه تُحسب
+     * نافذة الأربع وعشرين ساعة والعدّاد غير المقروء — وكتابته في جولة منفصلة
+     * تترك فرصة لرسالة مخزّنة بلا نافذة، فيرفض التطبيق رداً تقبله Meta.
+     *
+     * ونفس `now` للرسالة وللمحادثة: مقارنة «بعد آخر قراءة» تتمّ على الوقتين
+     * معاً، وفرق ميلّي ثانية بينهما يُظهر رسالة مقروءة كأنها جديدة.
+     *
+     * والتحديث مقيّد بـ tenantId: محادثة لمتجر آخر تُفشل المعاملة كلها بدل
+     * أن تُلحَق بها رسالة من هذا المتجر.
+     */
     async addMessage(data: {
       conversationId: string;
       role: "USER" | "AGENT" | "HUMAN" | "SYSTEM";
@@ -203,14 +217,27 @@ export function tenantScope(tenantId: string) {
       toolCalls?: unknown;
       usage?: unknown;
     }) {
-      return prisma.message.create({
-        data: {
-          ...data,
-          tenantId,
-          toolCalls: (data.toolCalls ?? undefined) as Prisma.InputJsonValue | undefined,
-          usage: (data.usage ?? undefined) as Prisma.InputJsonValue | undefined,
-        },
-      });
+      const now = new Date();
+      const [message] = await prisma.$transaction([
+        prisma.message.create({
+          data: {
+            ...data,
+            tenantId,
+            createdAt: now,
+            toolCalls: (data.toolCalls ?? undefined) as Prisma.InputJsonValue | undefined,
+            usage: (data.usage ?? undefined) as Prisma.InputJsonValue | undefined,
+          },
+        }),
+        prisma.conversation.update({
+          where: { id: data.conversationId, tenantId },
+          data: {
+            lastMessageAt: now,
+            ...(data.role === "USER" ? { lastInboundAt: now } : {}),
+          },
+          select: { id: true },
+        }),
+      ]);
+      return message;
     },
 
     /** يمنع معالجة نفس رسالة Meta مرتين عند إعادة الإرسال. */
@@ -222,9 +249,11 @@ export function tenantScope(tenantId: string) {
       return !!found;
     },
 
+    // tenantId في الشرط وإن كان المعرّف فريداً: معرّف محادثة مسرَّب أو
+    // مُخمَّن من متجر آخر يفشل هنا بدل أن يُسكت وكيل غيره.
     async handoff(conversationId: string, reason: string) {
       return prisma.conversation.update({
-        where: { id: conversationId },
+        where: { id: conversationId, tenantId },
         data: { status: "HUMAN", handoffReason: reason, handoffAt: new Date() },
       });
     },

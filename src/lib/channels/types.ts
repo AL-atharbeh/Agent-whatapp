@@ -26,4 +26,30 @@ export type InboundMessage = {
   unsupportedKind?: string;
 };
 
-export type OutboundResult = { ok: boolean; error?: string };
+/**
+ * نتيجة إرسال لـ Meta.
+ *
+ * `kind` عند الفشل يفرّق بين حالتين يجب ألا تُعاملا كواحدة:
+ *   rejected — ردّت Meta برفض (4xx): الرسالة لم تصل يقيناً، والإعادة آمنة.
+ *   unknown  — مهلة، انقطاع، أو 5xx: ربما وصلت. إعادتها قد تُرسل للعميل ردّين.
+ *
+ * اختياري ليبقى من يفحص `ok` وحده يعمل كما كان.
+ */
+export type OutboundResult = { ok: boolean; error?: string; kind?: "rejected" | "unknown" };
+
+/**
+ * يصنّف فشل HTTP من Meta. 4xx رفضٌ صريح لطلبنا؛ 5xx خلل عندهم قد يقع
+ * بعد أن قبلوا الرسالة، فلا نعدّه رفضاً.
+ */
+export function failureKind(status: number): "rejected" | "unknown" {
+  return status >= 400 && status < 500 ? "rejected" : "unknown";
+}
+
+/**
+ * مصير الرسالة كما يجب أن يتصرّف عليه المنادي. نتيجة فاشلة بلا `kind`
+ * (من مسار قديم) تُعدّ unknown: افتراض الرفض هو ما يسمح بإرسال مكرّر.
+ */
+export function deliveryOutcome(r: OutboundResult): "sent" | "rejected" | "unknown" {
+  if (r.ok) return "sent";
+  return r.kind === "rejected" ? "rejected" : "unknown";
+}

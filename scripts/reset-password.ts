@@ -57,12 +57,27 @@ async function main() {
     return;
   }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { passwordHash: await hashPassword(password) },
-  });
+  /**
+   * تغيير كلمة السر يُخرج كل أجهزة الجوال في نفس المعاملة.
+   *
+   * أكثر سبب لتغييرها أن أحداً آخر عرفها — وقد يكون دخل من جواله. لو بقيت
+   * جلسته حيّة لظل يقرأ محادثات المتجر ثلاثين يوماً بعد «تأمين» الحساب.
+   * (جلسة الويب توقيع بلا حالة لا تُسحب من هنا — انظر lib/auth.ts.)
+   */
+  const now = new Date();
+  const [, revoked] = await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: await hashPassword(password) },
+    }),
+    prisma.deviceSession.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: now, pushToken: null },
+    }),
+  ]);
 
   console.log(`\n✅ تغيّرت كلمة سر ${user.email}`);
+  console.log(`   أُخرج ${revoked.count} جهاز جوال — يلزمها دخول من جديد`);
   console.log(`   سجّل الدخول: ${process.env.APP_BASE_URL ?? "http://localhost:3000"}/login\n`);
 }
 

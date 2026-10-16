@@ -39,7 +39,73 @@ model User {
   lastLoginAt DateTime?
   createdAt   DateTime  @default(now())
 
+  /**
+   * بداية «غير المقروء» لهذا المستخدم — أول دخول له من الجوال.
+   *
+   * بدونها كل رسالة سبقت أول دخول تُعدّ غير مقروءة: يفتح صاحب المتجر التطبيق
+   * أول مرة فيجد أربعمئة رسالة «جديدة» من شهور، فيتعلّم من اليوم الأول أن
+   * العدّاد لا يعني شيئاً — وهو العدّاد الذي بُني ليقول له أين ينظر.
+   * والمحادثات المحوّلة له لا تتأثر: عدّادها الأحمر من الحالة لا من القراءة.
+   */
+  inboxBaselineAt DateTime?
+
+  devices DeviceSession[]
+  reads   ConversationRead[]
+
   @@index([tenantId])
+}
+
+/**
+ * جلسة جهاز جوال — صفّ قابل للسحب، لا توقيع بلا حالة.
+ *
+ * جلسة الويب توقيع HMAC لا يُسحب إلا بتغيير مفتاح المنصة كلها. مقبول
+ * لمتصفح على مكتب، وغير مقبول لجوال قد يُسرَق أو يُباع: صاحب المتجر يحتاج
+ * أن يُخرج ذلك الجهاز وحده الآن، لا أن ينتظر ثلاثين يوماً.
+ *
+ * نخزّن هاش SHA-256 للرمز فقط: تسريب القاعدة لا يعطي رمزاً صالحاً.
+ * انظر docs/mobile-api.md.
+ */
+model DeviceSession {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // نسخة من User.tenantId لحظة الدخول — يُقارَن بها في كل طلب، فنقل
+  // المستخدم لمتجر آخر يُبطل جلساته بدل أن يفتح له بيانات المتجرين.
+  tenantId String
+
+  tokenHash String @unique
+  name      String
+  platform  String // ios | android
+
+  pushToken String?
+  notify    String  @default("all") // all | handoff | off
+
+  createdAt         DateTime  @default(now())
+  lastSeenAt        DateTime  @default(now())
+  expiresAt         DateTime // منزلقة: ٣٠ يوماً من آخر استخدام
+  absoluteExpiresAt DateTime // سقف مطلق: ٩٠ يوماً من الإنشاء — لا يمدّده الاستخدام
+  revokedAt         DateTime?
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([pushToken])
+}
+
+/**
+ * محاولات الدخول — عدّاد تحديد المعدّل.
+ *
+ * في القاعدة لا في الذاكرة: Vercel يشغّل نسخاً متعددة لا تشترك في ذاكرتها،
+ * فعدّاد محلي يعطي المهاجم خمس محاولات لكل نسخة بدل خمس إجمالاً.
+ */
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  key       String // البريد بعد التوحيد
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+  @@index([createdAt])
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -325,11 +391,51 @@ model Conversation {
   handoffAt     DateTime?
 
   messages  Message[]
+  reads     ConversationRead[]
   createdAt DateTime  @default(now())
   lastMessageAt DateTime @default(now())
 
+  /**
+   * وقت آخر رسالة من العميل نفسه (USER).
+   *
+   * منه تُحسب نافذة الرد الحرّ (٢٤ ساعة) والعدّاد غير المقروء. lastMessageAt
+   * لا يصلح بديلاً: ردّ الوكيل أو الموظف يحرّكه، فتبدو النافذة مفتوحة وهي
+   * مغلقة عند Meta — والنتيجة رسالة ترفضها Meta بعد أن كتبها الموظف.
+   */
+  lastInboundAt DateTime?
+
+  /**
+   * يتحرّك مع أي تغيير في المحادثة، لا مع الرسائل وحدها.
+   *
+   * بصمة الصندوق (`version`) كانت من آخر رسالة فقط، فاستلام زميلٍ محادثةً أو
+   * إعادتها للوكيل لا يغيّرها — يبقى جوال الموظف الآخر يعرضها «تنتظرك»
+   * فيردّ عليها اثنان. التحويل حدثٌ بلا رسالة، فيحتاج علامة غير الرسالة.
+   */
+  updatedAt DateTime @default(now()) @updatedAt
+
   @@unique([tenantId, channel, externalUserId])
   @@index([tenantId, status, lastMessageAt])
+  @@index([tenantId, channel, lastMessageAt])
+  @@index([tenantId, updatedAt])
+}
+
+/**
+ * آخر قراءة لكل مستخدم في كل محادثة.
+ *
+ * لكل مستخدم لا لكل محادثة: قراءة موظف لا يجب أن تُخفي العدّاد عن زميله،
+ * وإلا ظن الثاني أن أحداً ردّ والمحادثة في الحقيقة معلّقة.
+ */
+model ConversationRead {
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  tenantId       String
+  lastReadAt     DateTime
+
+  @@id([userId, conversationId])
+  @@index([tenantId])
+  @@index([conversationId])
 }
 
 model Message {
@@ -345,10 +451,57 @@ model Message {
   toolCalls  Json? // ما استدعاه الوكيل خلال هذا الرد (للتدقيق)
   usage      Json? // { input_tokens, output_tokens, cache_read_input_tokens }
 
+  /**
+   * معرّف يولّده الجوال لكل إرسال، يُعاد معها في الرد.
+   *
+   * به يطابق التطبيق فقاعة «جارٍ الإرسال» بالرسالة حين تصل في القائمة.
+   * أما منع الإرسال المكرّر فمسؤولية OutboundRequest لا هذا الحقل: الرسالة
+   * تُخزَّن بعد Meta، فقيد هنا وحده يأتي متأخراً عن الإرسال الثاني.
+   */
+  clientId String?
+
   createdAt DateTime @default(now())
 
+  // الحجز الذي أُرسلت به — فارغ لما لم يمر بحجز (الوكيل، الوارد، اللوحة)
+  outboundRequest OutboundRequest?
+
   @@unique([tenantId, externalId])
+  @@unique([tenantId, clientId])
   @@index([conversationId, createdAt])
+  @@index([tenantId, createdAt])
+}
+
+enum OutboundState {
+  PENDING // محجوز، والطلب لـ Meta جارٍ
+  SENT // قبلتها Meta وخُزّنت
+  UNKNOWN // لم تؤكّد Meta ولم ترفض — ربما وصلت، فلا تُعاد أبداً
+  FAILED // رفضتها Meta صراحةً — لم تصل، والإعادة بنفس المعرّف مسموحة
+}
+
+/**
+ * حجز إرسال من الجوال بمعرّف يولّده الجهاز (clientId).
+ *
+ * يُكتب *قبل* نداء Meta. قيد التفرّد هو ما يمنع طلبين متزامنين بنفس المعرّف
+ * من الوصول لـ Meta معاً — فحص «هل أُرسلت؟» ثم إرسال يتركهما يمرّان معاً.
+ * انظر src/lib/reservation.ts وجدول الحالات في docs/mobile-api.md.
+ */
+model OutboundRequest {
+  id       String @id @default(cuid())
+  tenantId String
+  clientId String
+
+  // sha256 للعملية (نوعها، المستلم، النص أو القالب) — نفس المعرّف لعملية
+  // أخرى خطأ في الجهاز لا إعادة محاولة
+  fingerprint String
+  state       OutboundState @default(PENDING)
+
+  messageId String?  @unique
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, clientId])
 }
 
 // ═══════════════════════════════════════════════════════════
