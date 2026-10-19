@@ -29,6 +29,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
@@ -46,3 +47,16 @@ flutter:
           weight: 600
         - asset: assets/fonts/IBMPlexSansArabic-Bold.ttf
           weight: 700
+
+# أيقونة التطبيق — تُولَّد بـ: dart run flutter_launcher_icons
+# المصدر: assets/icon/*.svg (شعار حاضر). iOS بلا شفافية لأن App Store يرفضها؛
+# Android متكيّفة: الروبوت في المنطقة الآمنة، والخلفية لون، فيقصّها كل جهاز
+# بشكله (دائرة أو مربع أو قطرة) دون أن يُقتطع منها شيء.
+flutter_launcher_icons:
+  image_path: "assets/icon/icon.png"
+  ios: true
+  remove_alpha_ios: true
+  android: true
+  adaptive_icon_background: "#09090b"
+  adaptive_icon_foreground: "assets/icon/icon_fg.png"
+  min_sdk_android: 21
