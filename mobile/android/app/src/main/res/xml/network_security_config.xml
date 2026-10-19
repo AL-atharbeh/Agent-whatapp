@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  لا HTTP صريح إطلاقاً في الإصدار: رمز الجلسة يمرّ في كل طلب، ونصّ غير مشفّر
+  على شبكة مقهى يعني جلسة مسروقة. شهادات المستخدم (user CAs) مرفوضة أيضاً
+  كي لا يكفي تثبيت شهادة وكيل على الجهاز لاعتراض الحركة.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

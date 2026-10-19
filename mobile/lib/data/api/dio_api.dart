@@ -1,0 +1,403 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+
+import '../../core/errors.dart';
+import '../../core/json.dart';
+import '../../core/server_clock.dart';
+import '../models.dart';
+import 'hader_api.dart';
+import 'retry_policy.dart';
+
+/// تنفيذ [HaderApi] فوق dio للخادم الحقيقي.
+class DioHaderApi implements HaderApi {
+  DioHaderApi({
+    required String baseUrl,
+    required String? Function() token,
+    required void Function() onUnauthenticated,
+    required ServerClock clock,
+    RetryPolicy retryPolicy = const RetryPolicy(),
+    HttpClientAdapter? adapter,
+  }) : _dio = Dio(
+          BaseOptions(
+            baseUrl: baseUrl,
+            // مهلات قصيرة نسبياً: شبكة جوال ميتة تُكتشف خلال ثوانٍ فتنتقل
+            // الرسالة إلى الطابور، بدل مؤشر يدور دقيقة كاملة.
+            connectTimeout: const Duration(seconds: 10),
+            sendTimeout: const Duration(seconds: 15),
+            receiveTimeout: const Duration(seconds: 20),
+            contentType: Headers.jsonContentType,
+            responseType: ResponseType.json,
+            headers: {'Accept': 'application/json'},
+          ),
+        ) {
+    if (adapter != null) _dio.httpClientAdapter = adapter;
+    _dio.interceptors.addAll([
+      _AuthInterceptor(token),
+      _ClockInterceptor(clock),
+      _RetryInterceptor(_dio, retryPolicy),
+      _ErrorInterceptor(onUnauthenticated),
+      if (kDebugMode) _SafeLogInterceptor(),
+    ]);
+  }
+
+  final Dio _dio;
+
+  static final _idempotent = Options(extra: {RetryPolicy.idempotentKey: true});
+
+  /// كل نداء يمرّ من هنا: الناتج إمّا جسم JSON وإمّا [ApiError] — لا غير.
+  Future<JsonMap> _send(
+    String method,
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+    Options? options,
+  }) async {
+    try {
+      final res = await _dio.request<Object?>(
+        path,
+        data: body,
+        queryParameters: query,
+        options: (options ?? Options()).copyWith(method: method),
+      );
+      return asMap(res.data);
+    } on DioException catch (e) {
+      final err = e.error;
+      throw err is ApiError ? err : mapDioException(e);
+    } on ApiError {
+      rethrow;
+    } catch (_) {
+      // جسم غير JSON أو خطأ تحليل: لا نُسقط التطبيق، نعيده خطأً مفهوماً.
+      throw const ApiError(ApiErrorCode.unknown, 'رد غير متوقّع من الخادم.');
+    }
+  }
+
+  @override
+  Future<LoginResult> login({
+    required String email,
+    required String password,
+    required String deviceName,
+    required String platform,
+  }) async {
+    final j = await _send(
+      'POST',
+      '/auth/login',
+      body: {
+        'email': email.trim(),
+        'password': password,
+        'device': {'name': deviceName, 'platform': platform},
+      },
+      options: Options(extra: {_noAuthKey: true}),
+    );
+    final r = LoginResult.fromJson(j);
+    if (r.token.isEmpty) {
+      throw const ApiError(ApiErrorCode.unknown, 'رد الدخول بلا رمز جلسة.');
+    }
+    return r;
+  }
+
+  @override
+  Future<void> logout() => _send('POST', '/auth/logout', options: _idempotent);
+
+  @override
+  Future<MeInfo> me() async => MeInfo.fromJson(await _send('GET', '/me'));
+
+  @override
+  Future<void> updateCurrentDevice({String? pushToken, NotifyMode? notify}) =>
+      _send('PUT', '/devices/current', body: {
+        'pushToken': ?pushToken,
+        if (notify != null) 'notify': notify.wire,
+      });
+
+  @override
+  Future<List<DeviceInfo>> devices() async =>
+      readList(await _send('GET', '/devices'), 'items', DeviceInfo.fromJson);
+
+  @override
+  Future<void> revokeDevice(String id) =>
+      _send('DELETE', '/devices/${Uri.encodeComponent(id)}');
+
+  @override
+  Future<InboxSummary> inboxSummary() async =>
+      InboxSummary.fromJson(await _send('GET', '/inbox/summary'));
+
+  @override
+  Future<ConversationPage> conversations(
+    Channel channel, {
+    String? cursor,
+    int limit = 30,
+  }) async =>
+      ConversationPage.fromJson(
+        await _send('GET', '/conversations', query: {
+          'channel': channel.wire,
+          'cursor': ?cursor,
+          'limit': limit.clamp(1, 50),
+        }),
+      );
+
+  @override
+  Future<ConversationItem> conversation(String id) async {
+    final j = await _send('GET', '/conversations/${_seg(id)}');
+    return _requireConversation(j['conversation']);
+  }
+
+  @override
+  Future<MessagePage> messages(
+    String id, {
+    String? before,
+    int limit = 50,
+  }) async =>
+      MessagePage.fromJson(
+        await _send('GET', '/conversations/${_seg(id)}/messages', query: {
+          'before': ?before,
+          'limit': limit.clamp(1, 50),
+        }),
+      );
+
+  @override
+  Future<void> markRead(String id) =>
+      _send('POST', '/conversations/${_seg(id)}/read', options: _idempotent);
+
+  @override
+  Future<SendResult> sendText(
+    String conversationId, {
+    required String text,
+    required String clientId,
+  }) async =>
+      SendResult.fromJson(
+        await _send(
+          'POST',
+          '/conversations/${_seg(conversationId)}/messages',
+          body: {'text': text, 'clientId': clientId},
+          options: _idempotent,
+        ),
+      );
+
+  @override
+  Future<ConversationItem> takeover(String id) async => _requireConversation(
+        (await _send('POST', '/conversations/${_seg(id)}/takeover',
+                options: _idempotent))['conversation'],
+      );
+
+  @override
+  Future<ConversationItem> release(String id) async => _requireConversation(
+        (await _send('POST', '/conversations/${_seg(id)}/release',
+                options: _idempotent))['conversation'],
+      );
+
+  @override
+  Future<List<MessageTemplate>> templates() async => readList(
+        await _send('GET', '/templates'),
+        'items',
+        MessageTemplate.fromJson,
+      );
+
+  @override
+  Future<SendResult> sendTemplate(
+    String conversationId, {
+    required TemplateSelection template,
+    required String clientId,
+  }) async =>
+      SendResult.fromJson(
+        await _send(
+          'POST',
+          '/conversations/${_seg(conversationId)}/template',
+          body: {...template.toJson(), 'clientId': clientId},
+          options: _idempotent,
+        ),
+      );
+
+  @override
+  Future<ConversationItem> startConversation({
+    required String phone,
+    String? name,
+    required TemplateSelection template,
+    required String clientId,
+  }) async {
+    final trimmedName = name?.trim();
+    final j = await _send(
+      'POST',
+      '/conversations/start',
+      body: {
+        'phone': phone.trim(),
+        if (trimmedName != null && trimmedName.isNotEmpty) 'name': trimmedName,
+        'template': template.toJson(),
+        'clientId': clientId,
+      },
+      options: _idempotent,
+    );
+    return _requireConversation(j['conversation']);
+  }
+
+  @override
+  Future<LeadPage> leads({String? cursor, int limit = 30}) async =>
+      LeadPage.fromJson(
+        await _send('GET', '/leads', query: {
+          'cursor': ?cursor,
+          'limit': limit.clamp(1, 50),
+        }),
+      );
+
+  /// معرّف من الخادم يدخل المسار كما هو؛ ترميزه يمنع `../` من تغيير النقطة.
+  static String _seg(String id) => Uri.encodeComponent(id);
+
+  static ConversationItem _requireConversation(Object? raw) {
+    final c = ConversationItem.fromJson(asMap(raw));
+    if (c == null) {
+      throw const ApiError(ApiErrorCode.unknown, 'رد غير مكتمل من الخادم.');
+    }
+    return c;
+  }
+}
+
+const _noAuthKey = 'noAuth';
+
+/// يحوّل أي DioException إلى [ApiError]. عام كي يُختبر وحده.
+ApiError mapDioException(DioException e) {
+  switch (e.type) {
+    case DioExceptionType.connectionTimeout:
+    case DioExceptionType.sendTimeout:
+    case DioExceptionType.receiveTimeout:
+    case DioExceptionType.transformTimeout:
+      return ApiError(
+        ApiErrorCode.timeout,
+        ApiError.defaultMessage(ApiErrorCode.timeout),
+      );
+    case DioExceptionType.connectionError:
+      return ApiError(
+        ApiErrorCode.network,
+        ApiError.defaultMessage(ApiErrorCode.network),
+      );
+    case DioExceptionType.badResponse:
+      final r = e.response;
+      return ApiError.fromResponse(
+        r?.statusCode,
+        r?.data,
+        retryAfterHeader: r?.headers.value('retry-after'),
+      );
+    case DioExceptionType.badCertificate:
+      // شهادة مزوّرة = اعتراض محتمل. لا نعيد المحاولة ولا نتجاوز.
+      return const ApiError(
+        ApiErrorCode.network,
+        'تعذّر التحقق من هوية الخادم. تأكد من شبكتك.',
+      );
+    case DioExceptionType.cancel:
+      return const ApiError(ApiErrorCode.unknown, 'أُلغي الطلب.');
+    case DioExceptionType.unknown:
+      if (e.error is SocketException || e.error is HttpException) {
+        return ApiError(
+          ApiErrorCode.network,
+          ApiError.defaultMessage(ApiErrorCode.network),
+        );
+      }
+      return ApiError(
+        ApiErrorCode.unknown,
+        ApiError.defaultMessage(ApiErrorCode.unknown),
+      );
+  }
+}
+
+class _AuthInterceptor extends Interceptor {
+  _AuthInterceptor(this._token);
+  final String? Function() _token;
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    if (options.extra[_noAuthKey] != true) {
+      final t = _token();
+      if (t != null && t.isNotEmpty) {
+        options.headers['Authorization'] = 'Bearer $t';
+      }
+    }
+    handler.next(options);
+  }
+}
+
+class _ClockInterceptor extends Interceptor {
+  _ClockInterceptor(this._clock);
+  final ServerClock _clock;
+
+  void _observe(Headers h) {
+    final raw = h.value('date');
+    if (raw == null) return;
+    try {
+      _clock.observe(HttpDate.parse(raw));
+    } catch (_) {
+      // رأس تاريخ تالف لا يعطّل الطلب.
+    }
+  }
+
+  @override
+  void onResponse(Response<dynamic> response, ResponseInterceptorHandler h) {
+    _observe(response.headers);
+    h.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    final r = err.response;
+    if (r != null) _observe(r.headers);
+    handler.next(err);
+  }
+}
+
+class _RetryInterceptor extends Interceptor {
+  _RetryInterceptor(this._dio, this._policy);
+  final Dio _dio;
+  final RetryPolicy _policy;
+
+  @override
+  Future<void> onError(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
+    final delay = _policy.delayFor(err);
+    if (delay == null) return handler.next(err);
+    await Future<void>.delayed(delay);
+    final o = err.requestOptions;
+    o.extra[RetryPolicy.attemptKey] =
+        ((o.extra[RetryPolicy.attemptKey] as int?) ?? 0) + 1;
+    try {
+      // نفس الجسم حرفياً — أي نفس clientId — فلا يصل العميل ردّان.
+      handler.resolve(await _dio.fetch<Object?>(o));
+    } on DioException catch (e) {
+      handler.next(e);
+    }
+  }
+}
+
+class _ErrorInterceptor extends Interceptor {
+  _ErrorInterceptor(this._onUnauthenticated);
+  final void Function() _onUnauthenticated;
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    final apiError = err.error is ApiError ? err.error! as ApiError : mapDioException(err);
+    // ‎401 من الدخول نفسه (INVALID_CREDENTIALS) ليس انتهاء جلسة؛ فقط
+    // UNAUTHENTICATED على طلب يحمل رمزاً يعني «الرمز سُحب أو انتهى».
+    if (apiError.code == ApiErrorCode.unauthenticated &&
+        err.requestOptions.extra[_noAuthKey] != true) {
+      _onUnauthenticated();
+    }
+    handler.next(err.copyWith(error: apiError));
+  }
+}
+
+/// سجل تطوير لا يطبع رؤوساً ولا أجساماً: الرمز في الرأس، وكلمة السر ورسائل
+/// العملاء في الأجسام — لا مكان لها في سجلات قد تُلصق في تذكرة دعم.
+class _SafeLogInterceptor extends Interceptor {
+  @override
+  void onResponse(Response<dynamic> response, ResponseInterceptorHandler h) {
+    debugPrint(
+        '[api] ${response.requestOptions.method} ${response.requestOptions.path} → ${response.statusCode}');
+    h.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    debugPrint(
+        '[api] ${err.requestOptions.method} ${err.requestOptions.path} ✗ ${err.response?.statusCode ?? err.type.name}');
+    handler.next(err);
+  }
+}

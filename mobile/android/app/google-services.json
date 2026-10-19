@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "614843049999",
+    "project_id": "hader-a2bee",
+    "storage_bucket": "hader-a2bee.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:614843049999:android:4dfbe72a0c92b653f41b7a",
+        "android_client_info": {
+          "package_name": "com.shifracode.hader"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDF4RKl6iq9ccmgwhXJRUnEWELf9SpSwbo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

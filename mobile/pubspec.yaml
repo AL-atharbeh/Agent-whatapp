@@ -1,0 +1,48 @@
+name: hader
+description: "حاضر — صندوق رسائل HADER لأصحاب المتاجر."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_riverpod: ^3.4.3
+  dio: ^5.11.1
+  flutter_secure_storage: ^11.2.0
+  sqflite: ^2.4.4+2
+  path: ^1.9.1
+  connectivity_plus: ^7.3.2
+  uuid: ^4.6.0
+  intl: ^0.20.2
+  local_auth: ^3.0.2
+  firebase_core: ^5.0.0
+  firebase_messaging: ^17.0.0
+  path_parsing: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # الخط مضمّن لا محمَّل من الشبكة: أول فتح بلا إنترنت يجب أن يظهر بالعربية
+  # الصحيحة، لا بخط النظام ثم «قفزة» حين يصل الخط.
+  fonts:
+    - family: IBMPlexSansArabic
+      fonts:
+        - asset: assets/fonts/IBMPlexSansArabic-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexSansArabic-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexSansArabic-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexSansArabic-Bold.ttf
+          weight: 700
