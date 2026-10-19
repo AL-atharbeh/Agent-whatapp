@@ -556,7 +556,6 @@ async function replyAsHumanRaw(formData: FormData) {
     tenantId,
     conversationId: id,
     text,
-    enforceWindow: false,
     claim: null,
   });
 

@@ -1,3 +1,4 @@
+import { isWindowRejection } from "../src/lib/channels/types";
 import assert from "node:assert/strict";
 import {
   ABSOLUTE_MS,
@@ -510,7 +511,22 @@ testAsync("readCappedText: content-length يكذب بالأصغر ⇒ يُعدّ
     }
   }
 
-  if (failures.length) {
+  // ── رفض انقضاء النافذة من Meta ─────────────────────────
+test("isWindowRejection: رموز Meta الثلاثة ونصّها", () => {
+  // نصوص كما تصل من meta.ts: «Meta 400: <body>»
+  assert.equal(isWindowRejection('Meta 400: {"error":{"message":"(#131047) Re-engagement message","code":131047}}'), true);
+  assert.equal(isWindowRejection('Meta 400: {"error":{"code":10,"error_subcode":2018278,"message":"(#10) This message is sent outside of allowed window."}}'), true);
+  assert.equal(isWindowRejection('Meta 400: {"error":{"code":10,"error_subcode":2534022}}'), true);
+});
+test("isWindowRejection: غيرها ليس رفض نافذة", () => {
+  assert.equal(isWindowRejection(undefined), false);
+  assert.equal(isWindowRejection(""), false);
+  assert.equal(isWindowRejection('Meta 400: {"error":{"code":131026,"message":"Message undeliverable"}}'), false);
+  assert.equal(isWindowRejection('Meta 400: {"error":{"code":1310470}}'), false, "رقم أطول يحوي 131047 ليس هو");
+  assert.equal(isWindowRejection("The operation was aborted due to timeout"), false);
+});
+
+if (failures.length) {
     console.error(failures.join("\n"));
     console.error(`\n${passed} نجح، ${failures.length} فشل`);
     process.exit(1);

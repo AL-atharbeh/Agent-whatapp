@@ -15,10 +15,9 @@ import {
   sendTemplate,
   type Template,
 } from "./channels/meta";
-import { deliveryOutcome, type OutboundResult } from "./channels/types";
+import { deliveryOutcome, isWindowRejection, type OutboundResult } from "./channels/types";
 import { tenantScope } from "./tenancy";
 import { isPlausiblePhone, normalizePhone } from "./phone";
-import { replyWindow } from "./mobile/window";
 import { decideReservation, fingerprint, type SendPayload } from "./reservation";
 
 /**
@@ -207,6 +206,8 @@ async function sendAndStore(opts: {
   reservationId: string | null;
   send: () => Promise<OutboundResult>;
   store: (reservationId: string | null) => Promise<Sent>;
+  /** ما يُقال للموظف إن رفضت Meta لانقضاء النافذة — يختلف بين القنوات */
+  windowClosed?: string;
 }): Promise<Sent> {
   let res: OutboundResult;
   try {
@@ -218,6 +219,9 @@ async function sendAndStore(opts: {
   const outcome = deliveryOutcome(res);
   if (outcome === "rejected") {
     await settle(opts.reservationId, "FAILED");
+    if (opts.windowClosed && isWindowRejection(res.error)) {
+      throw new OutboundError("WINDOW_CLOSED", opts.windowClosed, res.error);
+    }
     // لا نحفظ ما لم يُرسَل: سجل يُظهر رسالة لم تصل العميل أسوأ من لا سجل
     throw new OutboundError("SEND_FAILED", "فشل الإرسال", res.error);
   }
@@ -315,8 +319,9 @@ async function storeHuman(args: {
  * يُرسل عبر نفس القناة التي جاء منها العميل، ويُحفظ بدور HUMAN فيتميّز في
  * السجل عن رد الوكيل.
  *
- * `enforceWindow`: الجوال يفحص نافذة الأربع وعشرين ساعة قبل Meta ليعطي
- * الموظف سبباً واضحاً وطريقاً (القالب) بدل خطأ Meta بالإنجليزية.
+ * لا يُمنع مسبقاً بعد انقضاء نافذة الأربع وعشرين ساعة: الموظف يكتب في كل
+ * محادثة، في اللوحة والتطبيق معاً، والحكم لـ Meta. إن رفضت لهذا السبب جاء
+ * الرفض WINDOW_CLOSED بما يفعله الموظف بعده، لا «فشل الإرسال» المبهمة.
  * `claim`: الجوال يستلم المحادثة بالرد؛ اللوحة لا تزال تترك ذلك لزرّه.
  * `clientId`: بدونه (اللوحة) لا حجز — نموذج يُرسَل مرة بضغطة لا يُعاد آلياً.
  */
@@ -326,7 +331,6 @@ export async function sendHumanReply(args: {
   text: string;
   clientId?: string | null;
   channels?: readonly Channel[];
-  enforceWindow: boolean;
   claim: { reason: string | null } | null;
 }): Promise<Sent> {
   const { tenantId, text } = args;
@@ -372,13 +376,6 @@ export async function sendHumanReply(args: {
     );
   }
 
-  if (args.enforceWindow && !replyWindow(convo.lastInboundAt).open) {
-    throw new OutboundError(
-      "WINDOW_CLOSED",
-      "انتهت نافذة الرد الحرّ (٢٤ ساعة من آخر رسالة للعميل) — أرسل قالباً معتمداً",
-    );
-  }
-
   const account = tenant.channels.find((c) => c.channel === convo.channel);
   if (!account?.accessTokenEnc) {
     throw new OutboundError(
@@ -394,6 +391,10 @@ export async function sendHumanReply(args: {
 
   return sendAndStore({
     reservationId: held?.id ?? null,
+    windowClosed:
+      convo.channel === "WHATSAPP"
+        ? "رفض واتساب الرسالة: مرّ أكثر من ٢٤ ساعة على آخر رسالة من العميل. أرسل قالباً، وحين يردّ تعود الكتابة العادية."
+        : "رُفضت الرسالة: مرّ أكثر من ٢٤ ساعة على آخر رسالة من العميل. تستطيع الرد حين يكتب لك من جديد.",
     send: () =>
       sendMessage({
         channel: convo.channel,

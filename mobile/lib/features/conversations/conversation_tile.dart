@@ -158,33 +158,18 @@ class _WindowChip extends StatelessWidget {
     final w = item.window;
     final open = w.isOpenAt(now);
     final urgency = windowUrgency(w, now);
-    final relevant = item.isHuman || (open && urgency != WindowUrgency.calm);
+    // النافذة المنقضية لا شارة لها: الكتابة متاحة في كل محادثة كما في لوحة
+    // الويب، وشارة «مغلقة» أو «قالب فقط» كانت تُقرأ قيداً يفرضه التطبيق.
+    final relevant = open && (item.isHuman || urgency != WindowUrgency.calm);
     if (!relevant) return const SizedBox.shrink();
 
-    final Color fg;
-    final IconData icon;
-    final String label;
-    if (!open) {
-      // ما يستطيعه الموظف لا حالة النافذة: «مغلقة» وحدها كانت تُقرأ أن
-      // المحادثة انتهت، فتجتمع مع «تنتظرك» في صف واحد كأنها تناقضه. والقناتان
-      // بلا قوالب لا تملكان طريقاً للمبادرة أصلاً — ننتظر أن يكتب العميل.
-      fg = hc.text3;
-      if (item.channel.supportsTemplates) {
-        icon = Icons.lock_clock_outlined;
-        label = 'قالب فقط';
-      } else {
-        icon = Icons.hourglass_empty_rounded;
-        label = 'بانتظار ردّه';
-      }
-    } else {
-      fg = switch (urgency) {
-        WindowUrgency.critical => hc.danger,
-        WindowUrgency.soon => hc.warn,
-        WindowUrgency.calm => hc.live,
-      };
-      icon = Icons.schedule_rounded;
-      label = windowShortLabel(w, now) ?? '';
-    }
+    final fg = switch (urgency) {
+      WindowUrgency.critical => hc.danger,
+      WindowUrgency.soon => hc.warn,
+      WindowUrgency.calm => hc.live,
+    };
+    const icon = Icons.schedule_rounded;
+    final label = windowShortLabel(w, now) ?? '';
     return Padding(
       padding: const EdgeInsetsDirectional.only(start: 6),
       child: Container(

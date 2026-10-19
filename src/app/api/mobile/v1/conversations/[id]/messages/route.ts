@@ -91,7 +91,6 @@ export const POST = route<{ id: string }>(async (req, ctx) => {
     text: body.text,
     clientId: body.clientId,
     channels: MOBILE_CHANNELS,
-    enforceWindow: true,
     claim: { reason: "ردّ موظف من التطبيق" },
   });
 

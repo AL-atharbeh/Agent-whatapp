@@ -49,6 +49,26 @@ export function failureKind(status: number): "rejected" | "unknown" {
  * مصير الرسالة كما يجب أن يتصرّف عليه المنادي. نتيجة فاشلة بلا `kind`
  * (من مسار قديم) تُعدّ unknown: افتراض الرفض هو ما يسمح بإرسال مكرّر.
  */
+/**
+ * هل رفضت Meta الرسالة لانقضاء نافذة الرد الحرّ؟
+ *
+ * الرد العادي يُرسَل في كل محادثة، كما في لوحة الويب، والحكم لـ Meta لا لنا.
+ * لكن «فشل الإرسال» وحدها لا تقول للموظف لماذا ولا ماذا يفعل، فيعيد المحاولة
+ * مرة بعد مرة. هذا الرفض بالذات له علاج معروف — القالب، أو انتظار ردّ
+ * العميل — فنعرفه باسمه.
+ *
+ *   واتساب: 131047 (Re-engagement message)
+ *   ماسنجر: 2018278 · انستقرام: 2534022 — «outside of allowed window»
+ */
+export function isWindowRejection(error: string | undefined): boolean {
+  if (!error) return false;
+  return (
+    /\b131047\b/.test(error) ||
+    /\b(2018278|2534022)\b/.test(error) ||
+    /re-engagement|outside of (the )?allowed window/i.test(error)
+  );
+}
+
 export function deliveryOutcome(r: OutboundResult): "sent" | "rejected" | "unknown" {
   if (r.ok) return "sent";
   return r.kind === "rejected" ? "rejected" : "unknown";

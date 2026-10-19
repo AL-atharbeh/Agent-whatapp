@@ -87,6 +87,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final hc = context.hc;
     final outbox = ref.read(outboxProvider.notifier);
     final uncertain = e.state == OutboxState.uncertain;
+    final conv = ref.read(chatProvider(widget.conversationId)).conversation ?? widget.initial;
+    // الرفض لانقضاء النافذة لا تحلّه الإعادة — يحلّه قالب. نعرضه هنا فقط،
+    // حيث يحتاجه الموظف، لا مكان خانة الكتابة.
+    final templateFix = e.errorCode == 'WINDOW_CLOSED' && (conv?.channel.supportsTemplates ?? false);
     final choice = await showModalBottomSheet<String>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -103,6 +107,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: hc.text2),
               ),
             ),
+            if (templateFix)
+              ListTile(
+                key: const Key('failed.template'),
+                leading: Icon(Icons.description_outlined, color: hc.live),
+                title: const Text('أرسل قالب بدلاً منها'),
+                subtitle: const Text('حين يردّ العميل تُفتح الكتابة العادية ٢٤ ساعة'),
+                onTap: () => Navigator.pop(ctx, 'template'),
+              ),
             if (uncertain)
               ListTile(
                 key: const Key('failed.sendAgain'),
@@ -137,6 +149,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         await outbox.sendAgain(e.clientId);
       case 'delete':
         await outbox.discard(e.clientId);
+      case 'template':
+        await outbox.discard(e.clientId);
+        await _sendTemplate();
     }
   }
 
@@ -481,29 +496,10 @@ class _ComposerState extends State<Composer> {
     final open = w.isOpenAt(widget.now);
     final bottom = MediaQuery.paddingOf(context).bottom;
 
-    if (c.status == ConversationStatus.closed && !open) {
-      return _ClosedPanel(
-        bottom: bottom,
-        icon: Icons.inventory_2_outlined,
-        text: 'المحادثة مغلقة.',
-        action: c.channel.supportsTemplates ? 'أرسل قالب' : null,
-        onAction: widget.onTemplate,
-      );
-    }
-
-    if (!open) {
-      return _ClosedPanel(
-        key: const Key('composer.closed'),
-        bottom: bottom,
-        icon: Icons.lock_clock_outlined,
-        text: c.channel.supportsTemplates
-            ? 'انتهت نافذة الـ٢٤ ساعة. يمكنك المراسلة بقالب معتمد فقط.'
-            : 'انتهت نافذة الرد على ${c.channel.label}. تُفتح من جديد حين يراسلك العميل.',
-        action: c.channel.supportsTemplates ? 'أرسل قالب' : null,
-        onAction: widget.onTemplate,
-      );
-    }
-
+    // خانة الكتابة في كل محادثة، كما في لوحة الويب — قرار صاحب المنصة.
+    // كانت تُستبدل بزر قالب بعد ٢٤ ساعة، فبدا التطبيق كأنه يفرض القوالب على
+    // محادثات قائمة. القرار في النهاية لـ Meta: إن رفضت لانقضاء النافذة جاء
+    // الرفض برمز WINDOW_CLOSED، وفقاعة الفشل تعرض السبب وتقترح القالب.
     final label = windowRemainingLabel(w, widget.now);
     final urgency = windowUrgency(w, widget.now);
     final urgencyColor = switch (urgency) {
@@ -519,6 +515,23 @@ class _ComposerState extends State<Composer> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (!open)
+            Padding(
+              key: const Key('composer.windowHint'),
+              padding: const EdgeInsets.fromLTRB(6, 0, 6, 6),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 14, color: hc.text3),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      'مرّ أكثر من ٢٤ ساعة على آخر رسالة من العميل — قد يرفض ${c.channel.label} الرد العادي',
+                      style: TextStyle(fontFamily: kFont, fontSize: 11.5, color: hc.text3, height: 1.3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           if (label != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(6, 0, 6, 6),
