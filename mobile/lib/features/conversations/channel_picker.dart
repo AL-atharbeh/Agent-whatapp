@@ -250,9 +250,10 @@ class _Fan extends StatelessWidget {
   }
 
   Widget _bubble(BuildContext context, Channel c, int i, int n) {
-    // من الأعلى إلى اليمين: من ٩٥° إلى ١٥° لا إلى الصفر — القناة الأخيرة على
-    // مستوى الدائرة تماماً كان اسمها يجلس على البار.
-    const from = 95 * math.pi / 180, to = 15 * math.pi / 180;
+    // من الأعلى إلى اليمين: من ٩٠° إلى ١٥°. لا إلى الصفر — القناة الأخيرة على
+    // مستوى الدائرة كان اسمها يجلس على البار. ولا فوق ٩٠° — الأولى تميل
+    // يساراً فيخرج اسمها عن حافة الشاشة (الدائرة نفسها على بعد ١٨ منها).
+    const from = math.pi / 2, to = 15 * math.pi / 180;
     final angle = from - (from - to) * (n == 1 ? 0 : i / (n - 1));
     final target = Offset(math.cos(angle) * _radius, -math.sin(angle) * _radius);
 
