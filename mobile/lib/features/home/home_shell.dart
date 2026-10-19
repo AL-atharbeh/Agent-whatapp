@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/feedback.dart';
 import '../../core/providers.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/glass.dart';
 import '../chat/chat_screen.dart';
 import '../chat/outbox_controller.dart';
 import '../conversations/conversations_tab.dart';
@@ -148,34 +150,126 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       inboxProvider.select((s) => s.summary.channels.values.fold<int>(0, (a, c) => a + c.handoff)),
     );
 
+    // extendBody: المحتوى يمتد تحت البار العائم فيُرى مطموساً خلف زجاجه،
+    // و Scaffold يضيف ارتفاع البار إلى padding.bottom لما تحته — فالقوائم
+    // تعرف أين تنتهي دون أن يحسبه كل تبويب بنفسه.
     return Scaffold(
+      extendBody: true,
+      backgroundColor: hc.bg,
       body: IndexedStack(
         index: _tab,
         children: const [ConversationsTab(), SettingsTab(), ProfileTab()],
       ),
-      bottomNavigationBar: DecoratedBox(
-        decoration: BoxDecoration(border: Border(top: BorderSide(color: hc.border))),
-        child: NavigationBar(
-          selectedIndex: _tab,
-          onDestinationSelected: (i) => setState(() => _tab = i),
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: [
-            NavigationDestination(
-              icon: _TabIcon(Icons.chat_bubble_outline_rounded, badge: handoffTotal),
-              selectedIcon: _TabIcon(Icons.chat_bubble_rounded, badge: handoffTotal),
-              label: 'المحادثات',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.tune_rounded),
-              selectedIcon: Icon(Icons.tune_rounded),
-              label: 'الإعدادات',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded),
-              selectedIcon: Icon(Icons.person_rounded),
-              label: 'الملف',
-            ),
-          ],
+      bottomNavigationBar: _GlassTabBar(
+        index: _tab,
+        onTap: (i) {
+          if (i != _tab) HapticFeedback.selectionClick();
+          setState(() => _tab = i);
+        },
+        tabs: [
+          _TabSpec(Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'المحادثات', badge: handoffTotal),
+          const _TabSpec(Icons.tune_rounded, Icons.tune_rounded, 'الإعدادات'),
+          const _TabSpec(Icons.person_outline_rounded, Icons.person_rounded, 'الملف'),
+        ],
+      ),
+    );
+  }
+}
+
+class _TabSpec {
+  const _TabSpec(this.icon, this.selectedIcon, this.label, {this.badge = 0});
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final int badge;
+}
+
+/// البار السفلي: كبسولة زجاجية عائمة.
+///
+/// شريط ملتصق بالحافة يقتطع من الشاشة ويفصلها عن المحتوى. الكبسولة تطفو
+/// بهامش من الأطراف، والمحتوى يمرّ خلفها مطموساً — القائمة تبدو أطول، والبار
+/// أخفّ، والمختار يُعلَّم بكبسولة داخلية تنزلق بين الخانات.
+class _GlassTabBar extends StatelessWidget {
+  const _GlassTabBar({required this.index, required this.onTap, required this.tabs});
+
+  final int index;
+  final ValueChanged<int> onTap;
+  final List<_TabSpec> tabs;
+
+  @override
+  Widget build(BuildContext context) {
+    final safe = MediaQuery.paddingOf(context).bottom;
+    return Padding(
+      // فوق مؤشر الرجوع للشاشة الرئيسية لا عليه، وبهامش ثابت حين لا يوجد
+      padding: EdgeInsets.fromLTRB(18, 0, 18, safe > 0 ? safe - 8 : 14),
+      child: Glass(
+        radius: 36,
+        padding: const EdgeInsets.all(6),
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            children: [
+              for (var i = 0; i < tabs.length; i++)
+                Expanded(
+                  child: _TabButton(
+                    key: Key('tab.$i'),
+                    spec: tabs[i],
+                    selected: i == index,
+                    onTap: () => onTap(i),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TabButton extends StatelessWidget {
+  const _TabButton({super.key, required this.spec, required this.selected, required this.onTap});
+
+  final _TabSpec spec;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final hc = context.hc;
+    final color = selected ? hc.text : hc.text3;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: spec.badge > 0 ? '${spec.label}، ${spec.badge} تنتظرك' : spec.label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            color: selected ? hc.text.withValues(alpha: 0.10) : Colors.transparent,
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _TabIcon(selected ? spec.selectedIcon : spec.icon, badge: spec.badge, color: color),
+              const SizedBox(height: 3),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  fontFamily: kFont,
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: color,
+                  height: 1.2,
+                ),
+                child: Text(spec.label, maxLines: 1),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -183,19 +277,21 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 }
 
 class _TabIcon extends StatelessWidget {
-  const _TabIcon(this.icon, {required this.badge});
+  const _TabIcon(this.icon, {required this.badge, required this.color});
 
   final IconData icon;
   final int badge;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     final hc = context.hc;
-    if (badge <= 0) return Icon(icon);
+    final glyph = Icon(icon, color: color, size: 25);
+    if (badge <= 0) return glyph;
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Icon(icon),
+        glyph,
         PositionedDirectional(
           top: -6,
           end: -12,

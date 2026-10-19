@@ -6,43 +6,64 @@ import '../../core/now.dart';
 import '../../data/models.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/glass.dart';
+import '../../ui/widgets/glyphs.dart';
 import '../chat/chat_screen.dart';
 import '../profile/profile_controller.dart';
-import 'channel_rail.dart';
+import 'channel_picker.dart';
 import 'conversation_tile.dart';
 import 'conversations_controller.dart';
 import 'inbox_controller.dart';
 import 'new_conversation_screen.dart';
 
-/// تبويب المحادثات: الشريط على اليمين، قائمة القناة المختارة في الباقي.
+/// تبويب المحادثات: قائمة القناة بعرض الشاشة، ودائرة القنوات عائمة فوق البار.
 class ConversationsTab extends ConsumerWidget {
   const ConversationsTab({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final channel = ref.watch(selectedChannelProvider);
-    return Row(
+    return Stack(
       children: [
-        const ChannelRail(),
-        Expanded(
+        Positioned.fill(
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
+            duration: const Duration(milliseconds: 220),
             switchInCurve: Curves.easeOutCubic,
             child: ChannelInbox(key: ValueKey(channel), channel: channel),
           ),
+        ),
+        // يسار الشاشة فعلياً (نهاية السطر في RTL)، فوق البار — بالإحداثيات
+        // المادية لأن قوس القنوات يُحسب منها.
+        Positioned(
+          left: 18,
+          bottom: MediaQuery.paddingOf(context).bottom + 14,
+          child: const ChannelPicker(),
         ),
       ],
     );
   }
 }
 
-class ChannelInbox extends ConsumerWidget {
+/// فلتر القائمة — محلي على ما حُمّل، لا طلب للخادم.
+enum InboxFilter { all, waiting, unread }
+
+class ChannelInbox extends ConsumerStatefulWidget {
   const ChannelInbox({super.key, required this.channel});
 
   final Channel channel;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ChannelInbox> createState() => _ChannelInboxState();
+}
+
+class _ChannelInboxState extends ConsumerState<ChannelInbox> {
+  String _query = '';
+  InboxFilter _filter = InboxFilter.all;
+
+  Channel get channel => widget.channel;
+
+  @override
+  Widget build(BuildContext context) {
     final hc = context.hc;
     final tt = Theme.of(context).textTheme;
     final state = ref.watch(conversationsProvider(channel));
@@ -64,14 +85,27 @@ class ChannelInbox extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 8, 8),
+            padding: const EdgeInsetsDirectional.fromSTEB(20, 10, 16, 2),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(channel.label, style: tt.headlineSmall),
+                      Row(
+                        children: [
+                          ChannelGlyph(channel, size: 26),
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: Text(
+                              channel.label,
+                              style: tt.headlineMedium?.copyWith(fontWeight: FontWeight.w800, height: 1.15),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
                       Text(
                         subtitle,
                         style: tt.bodySmall?.copyWith(
@@ -83,30 +117,57 @@ class ChannelInbox extends ConsumerWidget {
                   ),
                 ),
                 if (channel.supportsTemplates && !notConnected)
-                  IconButton.filledTonal(
-                    key: const Key('conv.new'),
-                    tooltip: 'محادثة جديدة',
-                    style: IconButton.styleFrom(
-                      backgroundColor: hc.surface2,
-                      foregroundColor: hc.text,
-                      minimumSize: const Size(46, 46),
+                  Semantics(
+                    button: true,
+                    label: 'محادثة جديدة',
+                    child: GestureDetector(
+                      key: const Key('conv.new'),
+                      onTap: () => Navigator.of(context).push(NewConversationScreen.route()),
+                      child: SizedBox.square(
+                        dimension: 48,
+                        child: Glass(
+                          shadow: false,
+                          child: Icon(Icons.edit_square, size: 21, color: hc.text),
+                        ),
+                      ),
                     ),
-                    onPressed: () => Navigator.of(context).push(NewConversationScreen.route()),
-                    icon: const Icon(Icons.edit_square, size: 21),
                   ),
               ],
             ),
           ),
+          if (!notConnected) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+              child: _SearchField(onChanged: (q) => setState(() => _query = q.trim())),
+            ),
+            _FilterChips(
+              value: _filter,
+              waiting: summary.handoff,
+              unread: summary.unread,
+              onChanged: (f) => setState(() => _filter = f),
+            ),
+          ],
           if (!online) const OfflineBanner(),
-          Expanded(child: _body(context, ref, state, notConnected, now)),
+          Expanded(child: _body(context, state, notConnected, now)),
         ],
       ),
     );
   }
 
-  Widget _body(BuildContext context, WidgetRef ref, ConversationsState state, bool notConnected, DateTime now) {
+  /// يطابق الاسم أو أي جزء من الرقم — الموظف يتذكّر «اللي رقمه ينتهي بـ ٢٢٦٨».
+  bool _matches(ConversationItem c) {
+    if (_query.isEmpty) return true;
+    final q = _query.toLowerCase();
+    final digits = arToAsciiDigits(q).replaceAll(RegExp(r'\D'), '');
+    if ((c.customerName ?? '').toLowerCase().contains(q)) return true;
+    return digits.isNotEmpty && c.displayId.replaceAll(RegExp(r'\D'), '').contains(digits);
+  }
+
+  Widget _body(BuildContext context, ConversationsState state, bool notConnected, DateTime now) {
     final hc = context.hc;
     final ctrl = ref.read(conversationsProvider(channel).notifier);
+    // مساحة البار العائم ودائرة القنوات: آخر صف يُمرَّر فوقهما لا تحتهما
+    final tail = MediaQuery.paddingOf(context).bottom + ChannelPicker.orbSize + 28;
 
     if (notConnected) {
       return StateMessage(
@@ -144,6 +205,35 @@ class ChannelInbox extends ConsumerWidget {
     }
 
     void open(ConversationItem c) => Navigator.of(context).push(ChatScreen.route(c.id, initial: c));
+
+    // مع بحث أو فلتر: قائمة واحدة مسطّحة — الأقسام تخدم التصفّح لا البحث
+    final flat = _query.isNotEmpty || _filter != InboxFilter.all;
+    if (flat) {
+      final all = [...state.pinned, ...state.items].where(_matches).where((c) => switch (_filter) {
+            InboxFilter.all => true,
+            InboxFilter.waiting => c.isHuman,
+            InboxFilter.unread => c.unreadCount > 0,
+          });
+      final list = all.toList();
+      if (list.isEmpty) {
+        return StateMessage(
+          icon: _query.isNotEmpty ? Icons.search_off_rounded : Icons.done_all_rounded,
+          title: _query.isNotEmpty
+              ? 'لا نتائج لـ «$_query»'
+              : _filter == InboxFilter.waiting
+                  ? 'لا أحد ينتظرك هنا'
+                  : 'لا شيء غير مقروء',
+          body: _query.isNotEmpty ? 'جرّب جزءاً من الاسم أو آخر أرقام الهاتف.' : 'الوكيل يتولّى الباقي.',
+        );
+      }
+      return ListView.separated(
+        key: PageStorageKey('flat.${channel.wire}'),
+        padding: EdgeInsets.only(bottom: tail),
+        itemCount: list.length,
+        separatorBuilder: (_, _) => Divider(indent: 82, color: hc.border.withValues(alpha: 0.7)),
+        itemBuilder: (_, i) => ConversationTile(item: list[i], now: now, onTap: () => open(list[i])),
+      );
+    }
 
     return RefreshIndicator(
       onRefresh: ctrl.refresh,
@@ -202,12 +292,115 @@ class ChannelInbox extends ConsumerWidget {
           ),
           SliverToBoxAdapter(
             child: SizedBox(
-              height: 72,
+              height: tail,
               child: state.loadingMore
                   ? const Center(child: SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2.2)))
                   : null,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SearchField extends StatelessWidget {
+  const _SearchField({required this.onChanged});
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final hc = context.hc;
+    return TextField(
+      key: const Key('conv.search'),
+      onChanged: onChanged,
+      textInputAction: TextInputAction.search,
+      style: TextStyle(fontFamily: kFont, fontSize: 15.5, color: hc.text),
+      decoration: InputDecoration(
+        hintText: 'بحث بالاسم أو الرقم',
+        prefixIcon: Icon(Icons.search_rounded, color: hc.text3),
+        isDense: true,
+        filled: true,
+        fillColor: hc.surface2,
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(R.xl), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(R.xl), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(R.xl),
+          borderSide: BorderSide(color: hc.border2),
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterChips extends StatelessWidget {
+  const _FilterChips({required this.value, required this.waiting, required this.unread, required this.onChanged});
+
+  final InboxFilter value;
+  final int waiting;
+  final int unread;
+  final ValueChanged<InboxFilter> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final hc = context.hc;
+    Widget chip(InboxFilter f, String label, {int count = 0, Color? accent}) {
+      final on = f == value;
+      return Padding(
+        padding: const EdgeInsetsDirectional.only(end: 8),
+        child: GestureDetector(
+          key: Key('filter.${f.name}'),
+          onTap: () => onChanged(f),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: on ? hc.text.withValues(alpha: 0.10) : Colors.transparent,
+              borderRadius: BorderRadius.circular(R.xl),
+              border: Border.all(color: on ? hc.border2 : hc.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: kFont,
+                    fontSize: 14,
+                    fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+                    color: on ? hc.text : hc.text2,
+                  ),
+                ),
+                if (count > 0) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    arDigits(count),
+                    style: TextStyle(
+                      fontFamily: kFont,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: accent ?? hc.text3,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          chip(InboxFilter.all, 'الكل'),
+          chip(InboxFilter.waiting, 'تنتظرك', count: waiting, accent: hc.handoff),
+          chip(InboxFilter.unread, 'غير مقروءة', count: unread),
         ],
       ),
     );

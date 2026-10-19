@@ -173,3 +173,15 @@ String ltr(String s) => '\u2066$s\u2069';
 
 /// اسم العرض: الاسم، أو الرقم المنسّق إن غاب.
 String displayName(ConversationItem c) => c.customerName ?? formatPhone(c.displayId);
+
+/// أرقام عربية (٠-٩) وفارسية (۰-۹) إلى لاتينية.
+///
+/// الكيبورد العربي يكتب «٢٢٦٨» والرقم مخزَّن «2268»: بدون هذا يبحث الموظف
+/// عن رقم يراه أمامه في القائمة فلا يجده.
+String arToAsciiDigits(String s) => s.replaceAllMapped(
+      RegExp('[٠-٩۰-۹]'),
+      (m) {
+        final c = m[0]!.codeUnitAt(0);
+        return String.fromCharCode(0x30 + (c >= 0x06F0 ? c - 0x06F0 : c - 0x0660));
+      },
+    );
