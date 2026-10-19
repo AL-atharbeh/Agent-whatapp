@@ -29,13 +29,20 @@ class InboxState {
 
 final inboxProvider = NotifierProvider<InboxController, InboxState>(InboxController.new);
 
-/// استطلاع `/inbox/summary` كل ٨ ثوانٍ في المقدّمة.
+/// استطلاع `/inbox/summary` في المقدّمة، بسرعة تتبع ما ينظر إليه المستخدم.
 ///
 /// هذا احتياط الإشعارات لا بديلها: إشعار قد يتأخر أو يُحجب، لكن من فتح
 /// التطبيق يجب أن يرى الجديد خلال ثوانٍ. في الخلفية يتوقف تماماً — لا بطارية
 /// ولا بيانات تُصرف على شاشة لا يراها أحد.
+///
+/// كان ثابتاً كل ٨ ثوانٍ، والخادم يحفظ الرسالة خلال أقل من ثانية — فيرى
+/// الموظف داخل محادثة جارية ردّ العميل متأخراً حتى ثماني ثوانٍ، ويظن التطبيق
+/// بطيئاً. داخل المحادثة المفتوحة كل ثانيتين، وعلى القائمة كل أربع.
 class InboxController extends Notifier<InboxState> {
-  static const interval = Duration(seconds: 8);
+  static const focused = Duration(seconds: 2);
+  static const idle = Duration(seconds: 4);
+
+  Duration get interval => ref.read(openConversationProvider) != null ? focused : idle;
   static const _cacheKey = 'inbox.summary';
 
   Timer? _timer;
@@ -49,6 +56,11 @@ class InboxController extends Notifier<InboxState> {
   InboxState build() {
     final account = ref.watch(accountKeyProvider);
     ref.onDispose(stop);
+    // فتح محادثة أو إغلاقها يغيّر السرعة فوراً، مع استطلاع فوري عند الفتح.
+    ref.listen(openConversationProvider, (prev, next) {
+      if (!isPolling || (prev == null) == (next == null)) return;
+      start();
+    });
     _hasLive = false;
     if (account == null) return const InboxState();
     unawaited(_loadCached());
