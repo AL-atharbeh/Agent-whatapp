@@ -60,9 +60,11 @@ export async function toItems(d: Reader, convos: Conversation[]): Promise<Conver
     // LATERAL: رسالة واحدة لكل محادثة عبر فهرس (conversationId, createdAt).
     // include بـ take:1 في Prisma يجلب رسائل المحادثات كلها ويقصّها في
     // الذاكرة — آلاف الصفوف لنحتاج منها ثمانين.
+    // ::int صريحاً: Prisma يربط رقم JS كـ bigint، و left() في Postgres لا تقبل
+    // إلا integer — فيفشل الاستعلام ولا يظهر ذلك إلا على قاعدة حقيقية.
     prisma.$queryRaw<LastRow[]>`
       SELECT c.id AS "conversationId", m.role::text AS role,
-             left(m.text, ${PREVIEW_CHARS}) AS text, m."createdAt" AS "createdAt"
+             left(m.text, ${PREVIEW_CHARS}::int) AS text, m."createdAt" AS "createdAt"
       FROM unnest(${ids}::text[]) AS c(id)
       CROSS JOIN LATERAL (
         SELECT role, text, "createdAt" FROM "Message"

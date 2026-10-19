@@ -5,7 +5,8 @@
 أولاً، ثم في الطرفين.
 
 ```
-Base URL:  https://agent-whatapp.vercel.app/api/mobile/v1
+Base URL:  https://hader.shifracode.com/api/mobile/v1
+           (لا *.vercel.app — بعض شبكات الجوال تحجبه، انظر mobile/lib/core/config.dart)
            (التطبيق يقرؤه من --dart-define=API_BASE)
 Auth:      Authorization: Bearer <token>
 Content:   application/json; charset=utf-8
