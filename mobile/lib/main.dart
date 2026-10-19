@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'core/appearance.dart';
 import 'core/error_handling.dart';
 import 'core/providers.dart';
 import 'data/local/app_database.dart';
@@ -34,6 +35,13 @@ Future<void> main() async {
     await db.setValue(AppDatabase.installMarkerKey, DateTime.now().toUtc().toIso8601String());
   }
 
+  ThemeMode themeMode;
+  try {
+    themeMode = ThemeModeController.parse(await db.getValue(ThemeModeController.key));
+  } catch (_) {
+    themeMode = ThemeMode.system;
+  }
+
   final session = await store.read();
   final lock = session == null ? const LockSettings() : await store.readLock();
   final push = await PushService.initialize();
@@ -48,6 +56,7 @@ Future<void> main() async {
         sessionStoreProvider.overrideWithValue(store),
         initialSessionProvider.overrideWithValue(session),
         initialLockProvider.overrideWithValue(lock),
+        initialThemeModeProvider.overrideWithValue(themeMode),
         pushServiceProvider.overrideWithValue(push),
       ],
       child: const HaderApp(),

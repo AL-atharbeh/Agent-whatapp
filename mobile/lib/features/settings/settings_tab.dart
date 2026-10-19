@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/appearance.dart';
 import '../../core/feedback.dart';
 import '../../core/format.dart';
 import '../../core/providers.dart';
@@ -133,7 +134,23 @@ class SettingsTab extends ConsumerWidget {
                 ListTile(
                   leading: _IconBox(Icons.palette_outlined, color: hc.text2),
                   title: const Text('المظهر'),
-                  subtitle: Text('يتبع إعداد النظام (داكن / فاتح)', style: tt.bodySmall),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: SegmentedButton<ThemeMode>(
+                      key: const Key('settings.theme'),
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(value: ThemeMode.system, label: Text('النظام'), icon: Icon(Icons.brightness_auto_rounded, size: 18)),
+                        ButtonSegment(value: ThemeMode.light, label: Text('فاتح'), icon: Icon(Icons.light_mode_rounded, size: 18)),
+                        ButtonSegment(value: ThemeMode.dark, label: Text('داكن'), icon: Icon(Icons.dark_mode_rounded, size: 18)),
+                      ],
+                      selected: {ref.watch(themeModeProvider)},
+                      onSelectionChanged: (s) {
+                        HapticFeedback.selectionClick();
+                        ref.read(themeModeProvider.notifier).set(s.first);
+                      },
+                    ),
+                  ),
                 ),
                 Divider(indent: 68, color: hc.border),
                 ListTile(

@@ -143,7 +143,9 @@ class _Orb extends StatelessWidget {
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 220),
                       transitionBuilder: (c, a) => ScaleTransition(scale: a, child: FadeTransition(opacity: a, child: c)),
-                      child: ChannelGlyph(channel, key: ValueKey(channel), size: 28),
+                      // شعار حاضر لا أيقونة القناة: الدائرة زرّ التطبيق نفسه،
+                      // والقناة الحالية ظاهرة في عنوان الشاشة بأيقونتها.
+                      child: const BrandMark(key: ValueKey('brand'), size: 30),
                     ),
                   ),
                 ),
