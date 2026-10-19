@@ -110,7 +110,6 @@ class ConversationTile extends StatelessWidget {
                               ),
                             ),
                           ),
-                          _WindowChip(item: item, now: now),
                           if (unread) ...[
                             const SizedBox(width: 6),
                             CountBadge(count: item.unreadCount, color: hc.live, textColor: hc.onLive, size: 21),
@@ -144,52 +143,3 @@ class ConversationTile extends StatelessWidget {
   }
 }
 
-/// مؤشر النافذة — يظهر فقط حيث يهمّ: محادثة يتولّاها المالك (HUMAN)، أو
-/// نافذة على وشك الإغلاق. مؤشر على كل صف يصبح ضجيجاً لا يُقرأ.
-class _WindowChip extends StatelessWidget {
-  const _WindowChip({required this.item, required this.now});
-
-  final ConversationItem item;
-  final DateTime now;
-
-  @override
-  Widget build(BuildContext context) {
-    final hc = context.hc;
-    final w = item.window;
-    final open = w.isOpenAt(now);
-    final urgency = windowUrgency(w, now);
-    // النافذة المنقضية لا شارة لها: الكتابة متاحة في كل محادثة كما في لوحة
-    // الويب، وشارة «مغلقة» أو «قالب فقط» كانت تُقرأ قيداً يفرضه التطبيق.
-    final relevant = open && (item.isHuman || urgency != WindowUrgency.calm);
-    if (!relevant) return const SizedBox.shrink();
-
-    final fg = switch (urgency) {
-      WindowUrgency.critical => hc.danger,
-      WindowUrgency.soon => hc.warn,
-      WindowUrgency.calm => hc.live,
-    };
-    const icon = Icons.schedule_rounded;
-    final label = windowShortLabel(w, now) ?? '';
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(start: 6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: fg.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(R.xs),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 12, color: fg),
-            const SizedBox(width: 3),
-            Text(
-              label,
-              style: TextStyle(fontFamily: kFont, fontSize: 11, fontWeight: FontWeight.w600, color: fg, height: 1.3),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

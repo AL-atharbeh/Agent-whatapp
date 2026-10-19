@@ -492,22 +492,13 @@ class _ComposerState extends State<Composer> {
   Widget build(BuildContext context) {
     final hc = context.hc;
     final c = widget.conversation;
-    final w = c.window;
-    final open = w.isOpenAt(widget.now);
     final bottom = MediaQuery.paddingOf(context).bottom;
 
-    // خانة الكتابة في كل محادثة، كما في لوحة الويب — قرار صاحب المنصة.
-    // كانت تُستبدل بزر قالب بعد ٢٤ ساعة، فبدا التطبيق كأنه يفرض القوالب على
-    // محادثات قائمة. القرار في النهاية لـ Meta: إن رفضت لانقضاء النافذة جاء
-    // الرفض برمز WINDOW_CLOSED، وفقاعة الفشل تعرض السبب وتقترح القالب.
-    final label = windowRemainingLabel(w, widget.now);
-    final urgency = windowUrgency(w, widget.now);
-    final urgencyColor = switch (urgency) {
-      WindowUrgency.critical => hc.danger,
-      WindowUrgency.soon => hc.warn,
-      WindowUrgency.calm => hc.text3,
-    };
-
+    // خانة كتابة صافية في كل محادثة، كما في لوحة الويب — قرار صاحب المنصة.
+    // لا عدّاد للنافذة ولا تنبيه فوقها: «باقي ٢٣ ساعة» لم تكن تخبر الموظف
+    // بشيء يفعله، والتنبيه بعد انقضائها بدا قيداً. الحكم لـ Meta: إن رفضت
+    // لانقضاء النافذة جاء الرفض WINDOW_CLOSED، وفقاعة الفشل تعرض السبب
+    // وتقترح القالب — في اللحظة التي يحتاجه فيها، لا قبلها.
     return Container(
       key: const Key('composer.open'),
       decoration: BoxDecoration(color: hc.bg2, border: Border(top: BorderSide(color: hc.border))),
@@ -515,42 +506,16 @@ class _ComposerState extends State<Composer> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (!open)
-            Padding(
-              key: const Key('composer.windowHint'),
-              padding: const EdgeInsets.fromLTRB(6, 0, 6, 6),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline_rounded, size: 14, color: hc.text3),
-                  const SizedBox(width: 5),
-                  Expanded(
-                    child: Text(
-                      'مرّ أكثر من ٢٤ ساعة على آخر رسالة من العميل — قد يرفض ${c.channel.label} الرد العادي',
-                      style: TextStyle(fontFamily: kFont, fontSize: 11.5, color: hc.text3, height: 1.3),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          if (label != null)
+          // ما يحدث عند الضغط لا ما يُمنع: الرد يستلم المحادثة من الوكيل
+          if (!c.isHuman)
             Padding(
               padding: const EdgeInsets.fromLTRB(6, 0, 6, 6),
-              child: Row(
-                children: [
-                  Icon(Icons.schedule_rounded, size: 14, color: urgencyColor),
-                  const SizedBox(width: 5),
-                  Text(
-                    label,
-                    key: const Key('composer.remaining'),
-                    style: TextStyle(fontFamily: kFont, fontSize: 12, fontWeight: FontWeight.w500, color: urgencyColor, height: 1.3),
-                  ),
-                  const Spacer(),
-                  if (!c.isHuman)
-                    Text(
-                      'ردّك يوقف الوكيل هنا',
-                      style: TextStyle(fontFamily: kFont, fontSize: 11.5, color: hc.text3, height: 1.3),
-                    ),
-                ],
+              child: Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Text(
+                  'ردّك يوقف الوكيل هنا',
+                  style: TextStyle(fontFamily: kFont, fontSize: 11.5, color: hc.text3, height: 1.3),
+                ),
               ),
             ),
           Row(
