@@ -4,6 +4,7 @@ export const BUSINESS_TYPES = [
   { value: "restaurant", label: "مطعم" },
   { value: "pharmacy", label: "صيدلية" },
   { value: "clinic", label: "عيادة" },
+  { value: "beauty", label: "صالون وتجميل" },
   { value: "realestate", label: "عقارات" },
   { value: "other", label: "أخرى" },
 ] as const;

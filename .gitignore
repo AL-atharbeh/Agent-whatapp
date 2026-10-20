@@ -13,3 +13,6 @@ tsconfig.tsbuildinfo
 # Firebase، ومفتاح APNs (.p8) يرسل إشعارات باسم تطبيقنا لأي جهاز.
 *firebase-adminsdk*.json
 *.p8
+
+# نسخ احتياطية لمحتوى متاجر (فيها أرقام عملاء) — scripts/demo-salon.ts
+backups/
