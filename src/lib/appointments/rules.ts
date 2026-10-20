@@ -372,5 +372,7 @@ export function templateVars(
   v: { customer: string; service: string; time: string; date: string; staff: string },
   count: number,
 ): string[] {
-  return [v.customer, v.service, v.time, v.date, v.staff].slice(0, Math.max(0, count));
+  // ميتا ترفض متغيّراً فارغاً (131008) — عميل بلا اسم يُخاطَب بلقب عام بدل إسقاط الرسالة
+  const filled = [v.customer.trim() || "عميلنا العزيز", v.service, v.time, v.date, v.staff].map((x) => x.trim() || "—");
+  return filled.slice(0, Math.max(0, count));
 }

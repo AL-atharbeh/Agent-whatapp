@@ -441,6 +441,8 @@ test("templateVars: مقصوصة لعدد ما يطلبه القالب", () => {
   assert.deepEqual(templateVars(v, 2), ["سامر", "تغيير زيت"]);
   assert.deepEqual(templateVars(v, 0), []);
   assert.equal(templateVars(v, 9).length, 5);
+  // عميل بلا اسم: لا متغيّر فارغ (ميتا ترفضه)
+  assert.deepEqual(templateVars({ ...v, customer: "  " }, 1), ["عميلنا العزيز"]);
 });
 
 // ═══════════════════════════════════════════════════════════
