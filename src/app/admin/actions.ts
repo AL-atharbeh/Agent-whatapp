@@ -10,12 +10,8 @@ import { normalizeArabic } from "@/lib/arabic";
 import { ALL_CHANNELS, getPlan, planAllowsChannel } from "@/lib/plans";
 import { decrypt, encrypt } from "@/lib/crypto";
 import { checkTemplateBody, createTemplate } from "@/lib/channels/meta";
-import {
-  OutboundError,
-  sendHumanReply,
-  startWhatsappConversation,
-  webErrorMessage,
-} from "@/lib/outbound";
+import { sendHumanReply, startWhatsappConversation } from "@/lib/outbound";
+import { report } from "./report";
 
 /**
  * إجراءات إدارة المتاجر — يستخدمها مالك المنصة وأصحاب المتاجر معاً.
@@ -27,31 +23,7 @@ import {
  * الإجراءات الحسّاسة (إنشاء/حذف متجر، القنوات، التفعيل) محصورة بـ requireAdmin.
  */
 
-/**
- * ينقل سبب الفشل إلى المستخدم بدل صفحة «صار خطأ في الخادم».
- *
- * الإجراءات ترمي رسائل عربية دقيقة، وNext.js تحجب نصّها في الإنتاج وتعرض
- * صفحة عامة برقم معرّف. فيرى صاحب المتجر عطلاً حيث كان شرطاً لم يستوفِه،
- * ويعيد المحاولة بنفس المُدخَل — والرسالة المكتوبة له في سجلّ لا يقرأه.
- *
- * فنلتقطها هنا ونعيد التوجيه حاملين إياها، ويعرضها <ActionError/>.
- *
- * و`redirect` نفسه يعمل برمي استثناء يحمل digest يبدأ بـ NEXT_ — فابتلاعه
- * هنا يكسر كل تحويل مقصود، لذا نمرّره كما هو.
- */
-function report(err: unknown, path: string): never {
-  const digest = (err as { digest?: string })?.digest;
-  if (typeof digest === "string" && digest.startsWith("NEXT_")) throw err;
-
-  const msg =
-    err instanceof OutboundError
-      ? webErrorMessage(err)
-      : err instanceof Error
-        ? err.message
-        : "صار خطأ غير متوقّع";
-  console.error("[action]", msg);
-  redirect(`${path}?err=${encodeURIComponent(msg)}`);
-}
+// report() في ملف مشترك — إجراءات المواعيد تستعمله أيضاً (انظر report.ts)
 
 const s = (v: FormDataEntryValue | null) => {
   const t = v?.toString().trim();
@@ -523,6 +495,22 @@ export async function revokeVoiceToken(formData: FormData) {
   const tenantId = await authorizeTenant(slug);
   await prisma.tenant.update({ where: { id: tenantId }, data: { voiceToken: null } });
   revalidatePath(`/admin/${slug}/channels`);
+}
+
+/**
+ * يفعّل وحدة المواعيد لمتجر أو يطفئها (docs/appointments.md).
+ *
+ * بيد مالك المنصة وحده: التفعيل يضيف ثماني أدوات وتعليمات للوكيل في كل
+ * رسالة — كلفة تُحسب في الباقة — ويشغّل رسائل تذكير لعملاء المتجر باسمه.
+ * الإطفاء لا يحذف شيئاً: الخدمات والفريق والمواعيد تبقى، والوحدة تختفي فقط.
+ */
+export async function setAppointmentsEnabled(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData.get("slug"))!;
+  const enabled = s(formData.get("enabled")) === "on" || s(formData.get("enabled")) === "true";
+  const tenantId = await authorizeTenant(slug);
+  await prisma.tenant.update({ where: { id: tenantId }, data: { appointmentsEnabled: enabled } });
+  revalidatePath(`/admin/${slug}`);
 }
 
 // ═══════════════════════════════════════════════════════════

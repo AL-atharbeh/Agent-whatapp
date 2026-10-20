@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/errors.dart';
 import '../../core/json.dart';
 import '../../core/server_clock.dart';
+import '../appointments.dart';
 import '../models.dart';
 import 'hader_api.dart';
 import 'retry_policy.dart';
@@ -238,6 +239,131 @@ class DioHaderApi implements HaderApi {
           'limit': limit.clamp(1, 50),
         }),
       );
+
+  // ───────────── المواعيد ─────────────
+
+  @override
+  Future<AppointmentDay> appointmentsDay(String date) async =>
+      AppointmentDay.fromJson(await _send('GET', '/appointments', query: {'date': date}));
+
+  /// غير مُعلَّم idempotent عمداً: العقد لا يعطي الحجز clientId، فإعادة
+  /// تلقائية بعد رد ضائع قد تُرجع SLOT_TAKEN لموعد أُنشئ فعلاً. القرار للمستخدم.
+  @override
+  Future<Appointment> createAppointment(NewAppointment request) async =>
+      _requireAppointment(await _send('POST', '/appointments', body: request.toJson()));
+
+  @override
+  Future<Appointment> appointmentAction(
+    String id,
+    AppointmentAction action, {
+    double? finalPrice,
+    String? notes,
+  }) async {
+    final body = action == AppointmentAction.finish
+        ? {'finalPrice': ?finalPrice, if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim()}
+        : null;
+    return _requireAppointment(await _send('POST', '/appointments/${_seg(id)}/${action.wire}', body: body));
+  }
+
+  @override
+  Future<Appointment> updateAppointment(
+    String id, {
+    DateTime? startAt,
+    String? staffId,
+    int? plannedMinutes,
+    String? notes,
+  }) async =>
+      _requireAppointment(await _send('PATCH', '/appointments/${_seg(id)}', body: {
+        if (startAt != null) 'startAt': startAt.toUtc().toIso8601String(),
+        'staffId': ?staffId,
+        'plannedMinutes': ?plannedMinutes,
+        'notes': ?notes,
+      }));
+
+  @override
+  Future<SlotsResult> appointmentSlots({
+    required String serviceId,
+    String? staffId,
+    required String date,
+    String? customerId,
+  }) async =>
+      SlotsResult.fromJson(await _send('GET', '/appointments/slots', query: {
+        'serviceId': serviceId,
+        'staffId': ?staffId,
+        'date': date,
+        'customerId': ?customerId,
+      }));
+
+  @override
+  Future<List<ServiceOffering>> services() async =>
+      readList(await _send('GET', '/services'), 'items', ServiceOffering.fromJson);
+
+  @override
+  Future<List<StaffMember>> staff() async =>
+      readList(await _send('GET', '/staff'), 'items', StaffMember.fromJson);
+
+  @override
+  Future<Uint8List?> staffPhoto(String staffId) async {
+    try {
+      final res = await _dio.get<List<int>>(
+        '/staff/${_seg(staffId)}/photo',
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final data = res.data;
+      return data == null || data.isEmpty ? null : Uint8List.fromList(data);
+    } on DioException catch (e) {
+      final err = e.error is ApiError ? e.error! as ApiError : mapDioException(e);
+      // لا صورة ليست خطأً يُعرض: الحروف الأولى بديل كامل.
+      if (err.code == ApiErrorCode.notFound) return null;
+      throw err;
+    }
+  }
+
+  @override
+  Future<List<Customer>> customers(String query) async =>
+      readList(await _send('GET', '/customers', query: {'q': query.trim()}), 'items', Customer.fromJson);
+
+  @override
+  Future<CustomerProfile> customerProfile(String id) async {
+    final p = CustomerProfile.fromJson(await _send('GET', '/customers/${_seg(id)}'));
+    if (p == null) throw const ApiError(ApiErrorCode.unknown, 'رد غير مكتمل من الخادم.');
+    return p;
+  }
+
+  @override
+  Future<Customer> createCustomer({required String phone, String? name, String? notes}) async =>
+      _requireCustomer(await _send('POST', '/customers', body: {
+        'phone': phone.trim(),
+        if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+        if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      }));
+
+  @override
+  Future<Customer> updateCustomer(
+    String id, {
+    String? name,
+    String? phone,
+    String? notes,
+    String? preferredStaffId,
+  }) async =>
+      _requireCustomer(await _send('PATCH', '/customers/${_seg(id)}', body: {
+        'name': ?name,
+        'phone': ?phone,
+        'notes': ?notes,
+        'preferredStaffId': ?preferredStaffId,
+      }));
+
+  static Appointment _requireAppointment(JsonMap j) {
+    final a = Appointment.fromJson(j);
+    if (a == null) throw const ApiError(ApiErrorCode.unknown, 'رد غير مكتمل من الخادم.');
+    return a;
+  }
+
+  static Customer _requireCustomer(JsonMap j) {
+    final c = Customer.fromJson(j);
+    if (c == null) throw const ApiError(ApiErrorCode.unknown, 'رد غير مكتمل من الخادم.');
+    return c;
+  }
 
   /// معرّف من الخادم يدخل المسار كما هو؛ ترميزه يمنع `../` من تغيير النقطة.
   static String _seg(String id) => Uri.encodeComponent(id);

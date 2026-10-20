@@ -48,6 +48,7 @@ class MeController extends Notifier<MeInfo?> {
       channels: me.channels,
       deviceId: me.deviceId,
       notify: mode,
+      appointmentsEnabled: me.appointmentsEnabled,
     );
     unawaited(ref.read(databaseProvider).setJson(_cacheKey, state!.toJson()));
   }

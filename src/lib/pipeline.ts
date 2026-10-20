@@ -7,6 +7,7 @@ import { downloadAudio, sendAudio, sendMessage } from "./channels/meta";
 import { MAX_TTS_CHARS, synthesize, transcribe } from "./speech";
 import type { InboundMessage } from "./channels/types";
 import { schedulePush } from "./mobile/push";
+import { upsertCustomerFromContact } from "./appointments/customers";
 import {
   loadTenantById,
   resolveTenantByChannelAccount,
@@ -136,6 +137,20 @@ export async function handleInbound(msg: InboundMessage): Promise<void> {
     // فلم يجد الرسالة التي نُبّه إليها. ومُجدوَل لا منتظَر — بطء FCM لا
     // يؤخّر رد الوكيل، وفشله لا يصل إلى هنا.
     schedulePush({ tenantId: tenant.id, type: "message", conversation: convo, text: storedText });
+
+    // التعرّف على العميل لوحدة المواعيد — لمتجر فعّلها فقط، فلا استعلام
+    // زائد على متجر لا يحجز. ولا يرمي أبداً: سجلّ عميل فشل إنشاؤه لا يجوز
+    // أن يمنع الرد على رسالته؛ أداة الحجز تعيد المحاولة حين تحتاجه.
+    if (
+      tenant.appointmentsEnabled &&
+      (msg.channel === "WHATSAPP" || msg.channel === "INSTAGRAM" || msg.channel === "MESSENGER")
+    ) {
+      await upsertCustomerFromContact(tenant.id, {
+        channel: msg.channel,
+        externalUserId: msg.externalUserId,
+        name: msg.customerName,
+      }).catch((err) => console.error("[pipeline] تعذّر ربط العميل بالمواعيد:", err));
+    }
 
     /**
      * كل تحويل يمر من هنا ليُشعَر الموظف.

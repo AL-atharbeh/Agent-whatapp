@@ -14,13 +14,17 @@ const TABS = [
   { href: "/leads", label: "العملاء المحتملون" },
 ];
 
-export default function Tabs({ slug }: { slug: string }) {
+// تبويب المواعيد لمتجر فعّل الوحدة وحده — غيره لا يرى أثراً لها
+const APPOINTMENTS = { href: "/appointments", label: "المواعيد" };
+
+export default function Tabs({ slug, appointments = false }: { slug: string; appointments?: boolean }) {
   const pathname = usePathname();
   const base = `/admin/${slug}`;
+  const tabs = appointments ? [...TABS.slice(0, 1), APPOINTMENTS, ...TABS.slice(1)] : TABS;
 
   return (
     <nav className="tabs">
-      {TABS.map((t) => {
+      {tabs.map((t) => {
         const href = `${base}${t.href}`;
         const active = t.href === "" ? pathname === base : pathname.startsWith(href);
         return (

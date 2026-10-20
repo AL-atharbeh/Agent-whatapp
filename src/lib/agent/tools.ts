@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Channel } from "@prisma/client";
 import type { TenantContext, TenantScope } from "../tenancy";
+import { buildAppointmentTools } from "./appointment-tools";
 
 /**
  * أدوات الوكيل — بصيغة محايدة عن المزوّد.
@@ -221,5 +222,12 @@ export function buildTools(args: {
   // حين يملك المتجر مصدراً حيّاً فعلاً.
   const tools = [searchCatalog, captureLead, handoff];
   if (tenant.dataSources.length) tools.splice(1, 0, getLiveData);
+
+  // أدوات الحجز بنفس المنطق وأشدّ: ثماني أدوات تُرسَل مع كل رسالة لمتجر لا
+  // يعمل بالمواعيد (ذهب، ملابس) كلفةٌ صافية — وقد تغري النموذج بعرض «حجز»
+  // لا وجود له. فلا تُبنى إطلاقاً ما لم تُفعَّل الوحدة لهذا المتجر.
+  if (tenant.appointmentsEnabled) {
+    tools.push(...buildAppointmentTools({ tenant, channel, externalUserId, state }));
+  }
   return tools;
 }

@@ -15,12 +15,16 @@ const TABS = [
   { href: "/subscription", label: "الاشتراك" },
 ];
 
-export default function PortalTabs() {
+// تبويب المواعيد لمتجر فعّل الوحدة وحده — غيره لا يرى أثراً لها
+const APPOINTMENTS = { href: "/appointments", label: "المواعيد" };
+
+export default function PortalTabs({ appointments = false }: { appointments?: boolean }) {
   const pathname = usePathname();
+  const tabs = appointments ? [...TABS.slice(0, 1), APPOINTMENTS, ...TABS.slice(1)] : TABS;
 
   return (
     <nav className="tabs">
-      {TABS.map((t) => {
+      {tabs.map((t) => {
         const href = `/app${t.href}`;
         const active = t.href === "" ? pathname === "/app" : pathname.startsWith(href);
         return (

@@ -57,7 +57,7 @@ export default async function PortalLayout({ children }: { children: React.React
           </div>
         )}
 
-        <PortalTabs />
+        <PortalTabs appointments={tenant.appointmentsEnabled} />
         {children}
       </main>
       <Footer />

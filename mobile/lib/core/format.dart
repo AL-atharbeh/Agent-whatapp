@@ -85,6 +85,11 @@ const _months = [
   'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول',
 ];
 
+/// أسماء الأيام والأشهر للشاشات الأخرى (المواعيد) — نفس المصدر كي لا
+/// يظهر «أيلول» في مكان و«سبتمبر» في آخر.
+String arWeekday(DateTime d) => _weekdays[d.weekday - 1];
+String arMonth(int month) => _months[(month - 1).clamp(0, 11)];
+
 DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 
 int _daysBetween(DateTime a, DateTime b) =>

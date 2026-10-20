@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import '../appointments.dart';
 import '../models.dart';
 
 /// واجهة الخادم كما في docs/mobile-api.md — نقطة لكل دالة.
@@ -64,4 +67,55 @@ abstract interface class HaderApi {
   });
 
   Future<LeadPage> leads({String? cursor, int limit = 30});
+
+  // ───────────── المواعيد (docs/appointments.md) — 404 لمتجر غير مفعّل ─────────────
+
+  /// [date] بصيغة `YYYY-MM-DD`.
+  Future<AppointmentDay> appointmentsDay(String date);
+
+  Future<Appointment> createAppointment(NewAppointment request);
+
+  /// `finish` وحده يقبل السعر والملاحظات.
+  Future<Appointment> appointmentAction(
+    String id,
+    AppointmentAction action, {
+    double? finalPrice,
+    String? notes,
+  });
+
+  Future<Appointment> updateAppointment(
+    String id, {
+    DateTime? startAt,
+    String? staffId,
+    int? plannedMinutes,
+    String? notes,
+  });
+
+  Future<SlotsResult> appointmentSlots({
+    required String serviceId,
+    String? staffId,
+    required String date,
+    String? customerId,
+  });
+
+  Future<List<ServiceOffering>> services();
+
+  Future<List<StaffMember>> staff();
+
+  /// null = لا صورة (404) — الواجهة تعرض الحروف الأولى.
+  Future<Uint8List?> staffPhoto(String staffId);
+
+  Future<List<Customer>> customers(String query);
+
+  Future<CustomerProfile> customerProfile(String id);
+
+  Future<Customer> createCustomer({required String phone, String? name, String? notes});
+
+  Future<Customer> updateCustomer(
+    String id, {
+    String? name,
+    String? phone,
+    String? notes,
+    String? preferredStaffId,
+  });
 }

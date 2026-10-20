@@ -211,6 +211,17 @@ model Tenant {
    */
   voiceToken String? @unique
 
+  /**
+   * وحدة المواعيد — اختيارية لأي نشاط بالمواعيد (عيادة، صالون، مركز صيانة…)،
+   * يفعّلها مالك المنصة لمتجر بعينه.
+   * بدونها لا أدوات حجز للوكيل ولا صفحات ولا مهام مجدولة: متجر ذهب لا
+   * يدفع ثمن تعريفات أدوات لا يستعملها في كل رسالة.
+   * انظر docs/appointments.md.
+   */
+  appointmentsEnabled Boolean @default(false)
+  /// { slotStepMinutes, bufferMinutes, reminderHour, … } — الافتراضيات في lib/appointments/settings.ts
+  appointmentSettings Json?
+
   profile       BusinessProfile?
   products      Product[]
   faqs          Faq[]
@@ -219,6 +230,11 @@ model Tenant {
   conversations Conversation[]
   leads         Lead[]
   users         User[]
+
+  services     Service[]
+  staff        Staff[]
+  customers    Customer[]
+  appointments Appointment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -523,4 +539,177 @@ model Lead {
   createdAt DateTime @default(now())
 
   @@index([tenantId, createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════
+//  المواعيد — لكل نشاط يعمل بالمواعيد (docs/appointments.md)
+// ═══════════════════════════════════════════════════════════
+
+enum AppointmentStatus {
+  BOOKED
+  CONFIRMED
+  IN_PROGRESS
+  DONE
+  CANCELLED
+  NO_SHOW
+}
+
+enum AppointmentSource {
+  WHATSAPP
+  INSTAGRAM
+  MESSENGER
+  WALK_IN
+  PHONE
+  DASHBOARD
+  APP
+}
+
+model Service {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name     String
+  category String?
+  priceMin Decimal  @db.Decimal(10, 2)
+  priceMax Decimal? @db.Decimal(10, 2) // null ⇒ سعر ثابت = priceMin
+
+  // المدة حين لا تاريخ للعميل ولا لمقدّم الخدمة — المقدِّر يتجاوزها حين يتعلّم
+  defaultMinutes Int
+
+  /**
+   * وقت انتظار داخل الخدمة (صبغة تثبت، تخدير يسري، طلاء يجف): مقدّم
+   * الخدمة حرّ خلاله. اختياري — 0 ⇒ لا انتظار. بدونه يُحسب الموعد كله
+   * انشغالاً، فيضيع نصف ساعة ينتظر فيها العميل ومقدّم الخدمة بلا عمل.
+   */
+  processingAfterMinutes Int @default(0) // بعد كم دقيقة من البدء يبدأ الانتظار
+  processingMinutes      Int @default(0) // طول الانتظار؛ 0 ⇒ لا انتظار
+
+  rebookAfterDays Int? // تذكير العودة؛ null ⇒ لا تذكير
+
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  staff        StaffService[]
+  appointments Appointment[]
+
+  @@index([tenantId, active, sortOrder])
+}
+
+model Staff {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name  String
+  phone String?
+
+  // صورة مصغّرة ≤ 150KB، تُخدم من مسار مخبّأ. photoEtag يُحسب عند الرفع
+  // كي تبني القائمة رابطاً بنسخة دون قراءة بايتات كل صورة.
+  photo     Bytes?
+  photoMime String?
+  photoEtag String?
+
+  // { "sat": [["10:00","14:00"],["16:00","21:00"]], "fri": [], … } بتوقيت المتجر
+  workingHours      Json
+  commissionPercent Decimal? @db.Decimal(5, 2)
+
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  services       StaffService[]
+  appointments   Appointment[]
+  preferredBy    Customer[]
+
+  @@index([tenantId, active, sortOrder])
+}
+
+model StaffService {
+  staffId   String
+  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([staffId, serviceId])
+  @@index([serviceId])
+}
+
+model Customer {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  phone String? // أرقام فقط بمفتاح الدولة
+  name  String?
+  notes String? @db.Text // ملاحظات دائمة (حساسية، تفضيلات)
+
+  preferredStaffId String?
+  preferredStaff   Staff?  @relation(fields: [preferredStaffId], references: [id], onDelete: SetNull)
+
+  visitCount  Int       @default(0)
+  noShowCount Int       @default(0)
+  lastVisitAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  contacts     CustomerContact[]
+  appointments Appointment[]
+
+  @@unique([tenantId, phone])
+  @@index([tenantId, name])
+}
+
+/// ربط العميل بقنواته — واتساب يعطي الرقم، انستقرام وماسنجر معرّفاً فقط.
+model CustomerContact {
+  id         String   @id @default(cuid())
+  tenantId   String
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  channel        Channel
+  externalUserId String
+
+  @@unique([tenantId, channel, externalUserId])
+  @@index([customerId])
+}
+
+model Appointment {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Restrict: حذف عميل أو مقدّم خدمة أو خدمة لا يمحو سجلّ ما حدث — منه يتعلّم
+  // المقدِّر وتُحسب العمولة. الإيقاف عبر active لا الحذف.
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  staffId    String
+  staff      Staff    @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  serviceId  String
+  service    Service  @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  startAt        DateTime
+  plannedMinutes Int // ما حجزناه — من مُقدِّر المدة لا من الخدمة
+  status         AppointmentStatus @default(BOOKED)
+  source         AppointmentSource
+
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  actualMinutes Int? // finishedAt - startedAt، مقرّبة — مادة المقدِّر
+  finalPrice    Decimal?  @db.Decimal(10, 2)
+  notes         String?   @db.Text // ملاحظات الزيارة: رقم صبغة، دواء، قطعة غيار…
+
+  confirmedAt     DateTime?
+  reminderSentAt  DateTime?
+  delayNotifiedAt DateTime?
+  rebookSentAt    DateTime?
+  cancelledAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, staffId, startAt])
+  @@index([tenantId, customerId, startAt])
+  @@index([tenantId, status, startAt])
+  @@index([serviceId, staffId, status])
 }

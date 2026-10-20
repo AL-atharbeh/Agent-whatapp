@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
 
 import '../../core/errors.dart';
+import '../appointments.dart';
 import '../models.dart';
 import 'fake_data.dart';
+import 'fake_bookings.dart';
 import 'hader_api.dart';
 
 /// خادم وهمي في الذاكرة يطبّق **نفس دلالات العقد**: النافذة من آخر رسالة
@@ -29,6 +32,7 @@ class FakeHaderApi implements HaderApi {
     this.onUnauthenticated,
     this.tenantInactive = false,
     this.slowCompletion = const Duration(seconds: 4),
+    this.appointmentsEnabled = true,
   })  : _random = random ?? Random(),
         _now = now ?? (() => DateTime.now().toUtc()) {
     _seed();
@@ -64,6 +68,12 @@ class FakeHaderApi implements HaderApi {
 
   /// المتجر موقوف: القراءة تعمل، والإرسال ‎403 TENANT_INACTIVE.
   bool tenantInactive;
+
+  /// وحدة المواعيد مفعّلة للمتجر الوهمي. false ⇒ ‎404 كما في العقد.
+  bool appointmentsEnabled;
+
+  /// حالة نشاط المواعيد الوهمي — مفتوحة للاختبارات.
+  late final FakeBookings bookings = FakeBookings(now: _now);
 
   /// متى يكتمل إرسال `#slow` بعد أن ردّ IN_PROGRESS.
   final Duration slowCompletion;
@@ -214,11 +224,14 @@ class FakeHaderApi implements HaderApi {
   }
 
   static const _user = UserInfo(id: 'u_1', email: demoEmail, name: 'بشار يوسف');
+  /// بلا timezone عمداً: مواعيد المتجر الوهمي مرسومة بتوقيت الجهاز، ومنطقة
+  /// ثابتة هنا («Asia/Amman») ستزيحها على أي جهاز خارج عمّان. العملة تُعرض.
   static const _tenant = TenantInfo(
     id: 't_1',
     slug: 'shifra-code',
     name: 'شيفرة كود',
     agentName: 'ريم',
+    currency: 'JOD',
   );
 
   /// يحاكي سحب الجلسة من جهاز آخر — يجعل الطلب التالي ‎401.
@@ -247,6 +260,7 @@ class FakeHaderApi implements HaderApi {
       ],
       deviceId: 'd_current',
       notify: _notify,
+      appointmentsEnabled: appointmentsEnabled,
     );
   }
 
@@ -593,6 +607,112 @@ class FakeHaderApi implements HaderApi {
         at: _now().subtract(const Duration(hours: 18)),
       ),
     ], nextCursor: null);
+  }
+
+  // ───────────── المواعيد ─────────────
+
+  Future<void> _appointmentsGate() async {
+    await _delay();
+    _requireAuth();
+    if (!appointmentsEnabled) {
+      throw ApiError(ApiErrorCode.notFound, ApiError.defaultMessage(ApiErrorCode.notFound), status: 404);
+    }
+  }
+
+  @override
+  Future<AppointmentDay> appointmentsDay(String date) async {
+    await _appointmentsGate();
+    return bookings.day(date);
+  }
+
+  @override
+  Future<Appointment> createAppointment(NewAppointment request) async {
+    await _appointmentsGate();
+    return bookings.create(request);
+  }
+
+  @override
+  Future<Appointment> appointmentAction(
+    String id,
+    AppointmentAction action, {
+    double? finalPrice,
+    String? notes,
+  }) async {
+    await _appointmentsGate();
+    return bookings.act(id, action, finalPrice: finalPrice, notes: notes);
+  }
+
+  @override
+  Future<Appointment> updateAppointment(
+    String id, {
+    DateTime? startAt,
+    String? staffId,
+    int? plannedMinutes,
+    String? notes,
+  }) async {
+    await _appointmentsGate();
+    return bookings.update(id, startAt: startAt, staffId: staffId, plannedMinutes: plannedMinutes, notes: notes);
+  }
+
+  @override
+  Future<SlotsResult> appointmentSlots({
+    required String serviceId,
+    String? staffId,
+    required String date,
+    String? customerId,
+  }) async {
+    await _appointmentsGate();
+    return bookings.slots(serviceId: serviceId, staffId: staffId, date: date, customerId: customerId);
+  }
+
+  @override
+  Future<List<ServiceOffering>> services() async {
+    await _appointmentsGate();
+    return bookings.services.values.toList();
+  }
+
+  @override
+  Future<List<StaffMember>> staff() async {
+    await _appointmentsGate();
+    return [...bookings.staff];
+  }
+
+  /// الفريق الوهمي بلا صور: الواجهة تعرض الحروف الأولى (المسار الأكثر شيوعاً
+  /// أول أسبوع لأي نشاط).
+  @override
+  Future<Uint8List?> staffPhoto(String staffId) async {
+    await _appointmentsGate();
+    return null;
+  }
+
+  @override
+  Future<List<Customer>> customers(String query) async {
+    await _appointmentsGate();
+    return bookings.search(query);
+  }
+
+  @override
+  Future<CustomerProfile> customerProfile(String id) async {
+    await _appointmentsGate();
+    return bookings.profile(id);
+  }
+
+  @override
+  Future<Customer> createCustomer({required String phone, String? name, String? notes}) async {
+    await _appointmentsGate();
+    return bookings.createCustomer(phone: phone, name: name, notes: notes);
+  }
+
+  @override
+  Future<Customer> updateCustomer(
+    String id, {
+    String? name,
+    String? phone,
+    String? notes,
+    String? preferredStaffId,
+  }) async {
+    await _appointmentsGate();
+    return bookings.updateCustomer(id, name: name, phone: phone, notes: notes, preferredStaffId: preferredStaffId);
   }
 
   // ───────────── محاكاة الحياة ─────────────

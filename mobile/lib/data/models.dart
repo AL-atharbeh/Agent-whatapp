@@ -322,22 +322,46 @@ class TenantInfo {
     required this.slug,
     required this.name,
     required this.agentName,
+    this.appointmentsEnabled = false,
+    this.timezone,
+    this.currency,
   });
 
-  factory TenantInfo.fromJson(JsonMap m) => TenantInfo(
-        id: readString(m, 'id'),
-        slug: readString(m, 'slug'),
-        name: readString(m, 'name', fallback: 'متجري'),
-        agentName: readNonEmptyOrNull(m, 'agentName'),
-      );
+  factory TenantInfo.fromJson(JsonMap m) {
+    final currency = readNonEmptyOrNull(m, 'currency')?.toUpperCase();
+    return TenantInfo(
+      id: readString(m, 'id'),
+      slug: readString(m, 'slug'),
+      name: readString(m, 'name', fallback: 'متجري'),
+      agentName: readNonEmptyOrNull(m, 'agentName'),
+      appointmentsEnabled: readBool(m, 'appointmentsEnabled'),
+      timezone: readNonEmptyOrNull(m, 'timezone'),
+      // رمز ISO من ثلاثة أحرف فقط؛ قيمة غريبة تُهمل بدل أن تظهر بجانب كل سعر.
+      currency: currency != null && RegExp(r'^[A-Z]{3}$').hasMatch(currency) ? currency : null,
+    );
+  }
 
   final String id;
   final String slug;
   final String name;
   final String? agentName;
+  final bool appointmentsEnabled;
 
-  JsonMap toJson() =>
-      {'id': id, 'slug': slug, 'name': name, 'agentName': agentName};
+  /// منطقة IANA للمتجر («Asia/Amman»). null ⇒ منطقة الجهاز.
+  final String? timezone;
+
+  /// رمز ISO للعملة («JOD»). null ⇒ الأسعار بلا عملة.
+  final String? currency;
+
+  JsonMap toJson() => {
+        'id': id,
+        'slug': slug,
+        'name': name,
+        'agentName': agentName,
+        'appointmentsEnabled': appointmentsEnabled,
+        'timezone': timezone,
+        'currency': currency,
+      };
 }
 
 class LoginResult {
@@ -383,11 +407,19 @@ class MeInfo {
     required this.channels,
     required this.deviceId,
     required this.notify,
+    this.appointmentsEnabled = false,
   });
 
   factory MeInfo.fromJson(JsonMap m) {
     final device = asMap(m['device']);
+    final tenant = asMap(m['tenant']);
+    final features = asMap(m['features']);
     return MeInfo(
+      // العقد لا يحدّد مكان العلم بعد: أعلى الرد، أو داخل tenant (كما في
+      // نموذج Prisma)، أو features. أيّها وُجد يكفي؛ غيابه = غير مفعّل.
+      appointmentsEnabled: readBool(m, 'appointmentsEnabled') ||
+          readBool(tenant, 'appointmentsEnabled') ||
+          readBool(features, 'appointments'),
       user: UserInfo.fromJson(asMap(m['user'])),
       tenant: TenantInfo.fromJson(asMap(m['tenant'])),
       channels: readList(m, 'channels', ChannelConnection.fromJson),
@@ -402,6 +434,9 @@ class MeInfo {
   final String? deviceId;
   final NotifyMode notify;
 
+  /// وحدة المواعيد مفعّلة لهذا المتجر ⇒ يظهر تبويب «المواعيد».
+  final bool appointmentsEnabled;
+
   bool isConnected(Channel c) =>
       channels.any((x) => x.channel == c && x.connected);
 
@@ -410,6 +445,7 @@ class MeInfo {
         'tenant': tenant.toJson(),
         'channels': [for (final c in channels) c.toJson()],
         'device': {'id': deviceId, 'notify': notify.wire},
+        'appointmentsEnabled': appointmentsEnabled,
       };
 }
 

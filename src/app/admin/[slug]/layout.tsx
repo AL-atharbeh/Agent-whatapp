@@ -21,7 +21,7 @@ export default async function TenantLayout({
   const { slug } = await params;
   const tenant = await prisma.tenant.findUnique({
     where: { slug },
-    select: { name: true, slug: true, agentName: true, status: true },
+    select: { name: true, slug: true, agentName: true, status: true, appointmentsEnabled: true },
   });
   if (!tenant) notFound();
 
@@ -44,7 +44,7 @@ export default async function TenantLayout({
       </div>
       <p className="sub">الوكيل: {tenant.agentName}</p>
 
-      <Tabs slug={tenant.slug} />
+      <Tabs slug={tenant.slug} appointments={tenant.appointmentsEnabled} />
       {children}
     </main>
   );

@@ -48,6 +48,7 @@ Content:   application/json; charset=utf-8
 | 409 | `IN_PROGRESS` | إرسال بنفس `clientId` ما زال جارياً — انتظر، لا تُعِد |
 | 409 | `DELIVERY_UNKNOWN` | Meta لم تؤكّد ولم ترفض (انقطاع) — **قد تكون وصلت العميل** |
 | 409 | `CHANNEL_NOT_CONNECTED` | القناة غير مربوطة لهذا المتجر |
+| 409 | `SLOT_TAKEN` | المواعيد: الوقت أُخذ للتو (حجز متزامن) — اعرض أوقاتاً أخرى من `/appointments/slots` |
 | 422 | `TEMPLATE_INVALID` | القالب غير معتمد أو متغيّراته ناقصة |
 | 429 | `RATE_LIMITED` | محاولات كثيرة — الرأس `Retry-After` بالثواني |
 | 502 | `SEND_FAILED` | Meta **رفضت صراحةً** — لم تصل العميل، وإعادتها بنفس `clientId` آمنة |
@@ -125,7 +126,7 @@ open = lastInboundAt != null && now < lastInboundAt + 24h
   "token": "…",
   "expiresAt": "2026-11-15T…Z",
   "user":   { "id": "…", "email": "…", "name": "…" },
-  "tenant": { "id": "…", "slug": "shifra-code", "name": "Shifra Code", "agentName": "…" }
+  "tenant": { "id": "…", "slug": "shifra-code", "name": "Shifra Code", "agentName": "…", "appointmentsEnabled": false, "timezone": "Asia/Amman", "currency": "JOD" }
 }
 ```
 - `PLATFORM_ADMIN` ⇒ `403 ADMIN_NOT_SUPPORTED`.

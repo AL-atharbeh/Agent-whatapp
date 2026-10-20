@@ -10,6 +10,8 @@ import '../../core/providers.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/glass.dart';
+import '../appointments/appointments_controller.dart';
+import '../appointments/appointments_tab.dart';
 import '../chat/chat_screen.dart';
 import '../chat/outbox_controller.dart';
 import '../conversations/conversations_tab.dart';
@@ -20,8 +22,12 @@ import '../profile/profile_tab.dart';
 import '../push/push_service.dart';
 import '../settings/settings_tab.dart';
 
-/// الهيكل بعد الدخول: ثلاث تبويبات + كل ما يعمل «في الخلفية» ما دام
-/// التطبيق في المقدّمة (استطلاع، طابور، إشعارات).
+/// التبويبات بمعرّف لا برقم: تبويب «المواعيد» يظهر ويختفي حسب المتجر، ولو
+/// حُفظ الاختيار رقماً لانتقل المستخدم صامتاً إلى تبويب آخر حين يتغيّر العدد.
+enum HomeTab { conversations, appointments, settings, profile }
+
+/// الهيكل بعد الدخول: ثلاث تبويبات (وأربع حين تُفعَّل المواعيد) + كل ما
+/// يعمل «في الخلفية» ما دام التطبيق في المقدّمة (استطلاع، طابور، إشعارات).
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
 
@@ -30,7 +36,8 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
-  int _tab = 0;
+  HomeTab _tab = HomeTab.conversations;
+  bool _foreground = true;
   late final AppLifecycleListener _lifecycle;
   final List<StreamSubscription<Object?>> _subs = [];
   bool _wasOffline = false;
@@ -61,13 +68,23 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     super.dispose();
   }
 
+  /// استطلاع المواعيد يعمل فقط والتبويب ظاهر والتطبيق في المقدّمة.
+  void _syncAppointmentsVisibility() {
+    final enabled = ref.read(meProvider)?.appointmentsEnabled ?? false;
+    ref.read(appointmentsVisibleProvider.notifier).set(enabled && _foreground && _tab == HomeTab.appointments);
+  }
+
   void _onResume() {
+    _foreground = true;
+    _syncAppointmentsVisibility();
     ref.read(appLockProvider.notifier).onForeground();
     ref.read(inboxProvider.notifier).start();
     unawaited(ref.read(outboxProvider.notifier).flush());
   }
 
   void _onBackground() {
+    _foreground = false;
+    _syncAppointmentsVisibility();
     ref.read(appLockProvider.notifier).onBackground();
     ref.read(inboxProvider.notifier).stop();
   }
@@ -150,6 +167,21 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       inboxProvider.select((s) => s.summary.channels.values.fold<int>(0, (a, c) => a + c.handoff)),
     );
 
+    final appointments = ref.watch(meProvider.select((m) => m?.appointmentsEnabled ?? false));
+    // أُطفئت الوحدة والمستخدم على تبويبها؟ يعود للمحادثات بدل شاشة لا تعمل.
+    ref.listen(meProvider.select((m) => m?.appointmentsEnabled ?? false), (_, on) {
+      if (!on && _tab == HomeTab.appointments) setState(() => _tab = HomeTab.conversations);
+      _syncAppointmentsVisibility();
+    });
+    final tabs = [
+      HomeTab.conversations,
+      if (appointments) HomeTab.appointments,
+      HomeTab.settings,
+      HomeTab.profile,
+    ];
+    final current = tabs.contains(_tab) ? _tab : HomeTab.conversations;
+    final index = tabs.indexOf(current);
+
     // extendBody: المحتوى يمتد تحت البار العائم فيُرى مطموساً خلف زجاجه،
     // و Scaffold يضيف ارتفاع البار إلى padding.bottom لما تحته — فالقوائم
     // تعرف أين تنتهي دون أن يحسبه كل تبويب بنفسه.
@@ -157,19 +189,38 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       extendBody: true,
       backgroundColor: hc.bg,
       body: IndexedStack(
-        index: _tab,
-        children: const [ConversationsTab(), SettingsTab(), ProfileTab()],
+        index: index,
+        children: [
+          for (final t in tabs)
+            switch (t) {
+              HomeTab.conversations => const ConversationsTab(),
+              HomeTab.appointments => const AppointmentsTab(),
+              HomeTab.settings => const SettingsTab(),
+              HomeTab.profile => const ProfileTab(),
+            },
+        ],
       ),
       bottomNavigationBar: _GlassTabBar(
-        index: _tab,
+        index: index,
         onTap: (i) {
-          if (i != _tab) HapticFeedback.selectionClick();
-          setState(() => _tab = i);
+          final next = tabs[i];
+          if (next != _tab) HapticFeedback.selectionClick();
+          setState(() => _tab = next);
+          _syncAppointmentsVisibility();
         },
         tabs: [
-          _TabSpec(Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'المحادثات', badge: handoffTotal),
-          const _TabSpec(Icons.tune_rounded, Icons.tune_rounded, 'الإعدادات'),
-          const _TabSpec(Icons.person_outline_rounded, Icons.person_rounded, 'الملف'),
+          for (final t in tabs)
+            switch (t) {
+              HomeTab.conversations => _TabSpec(
+                  Icons.chat_bubble_outline_rounded,
+                  Icons.chat_bubble_rounded,
+                  'المحادثات',
+                  badge: handoffTotal,
+                ),
+              HomeTab.appointments => const _TabSpec(Icons.event_note_outlined, Icons.event_note_rounded, 'المواعيد'),
+              HomeTab.settings => const _TabSpec(Icons.tune_rounded, Icons.tune_rounded, 'الإعدادات'),
+              HomeTab.profile => const _TabSpec(Icons.person_outline_rounded, Icons.person_rounded, 'الملف'),
+            },
         ],
       ),
     );
@@ -213,6 +264,7 @@ class _GlassTabBar extends StatelessWidget {
                 Expanded(
                   child: _TabButton(
                     key: Key('tab.$i'),
+                    labelKey: Key('tab.label.${tabs[i].label}'),
                     spec: tabs[i],
                     selected: i == index,
                     onTap: () => onTap(i),
@@ -227,9 +279,10 @@ class _GlassTabBar extends StatelessWidget {
 }
 
 class _TabButton extends StatelessWidget {
-  const _TabButton({super.key, required this.spec, required this.selected, required this.onTap});
+  const _TabButton({super.key, required this.spec, required this.selected, required this.onTap, this.labelKey});
 
   final _TabSpec spec;
+  final Key? labelKey;
   final bool selected;
   final VoidCallback onTap;
 
@@ -266,7 +319,7 @@ class _TabButton extends StatelessWidget {
                   color: color,
                   height: 1.2,
                 ),
-                child: Text(spec.label, maxLines: 1),
+                child: Text(spec.label, key: labelKey, maxLines: 1),
               ),
             ],
           ),

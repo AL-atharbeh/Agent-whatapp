@@ -11,6 +11,9 @@ enum ApiErrorCode {
   adminNotSupported('ADMIN_NOT_SUPPORTED'),
   notFound('NOT_FOUND'),
 
+  /// الوقت أُخذ بين عرضه والحجز (حجزان متزامنان) — اقترح غيره.
+  slotTaken('SLOT_TAKEN'),
+
   /// المتجر موقوف/اشتراكه منتهٍ: القراءة تعمل، الإرسال لا. ليس خروجاً.
   tenantInactive('TENANT_INACTIVE'),
   windowClosed('WINDOW_CLOSED'),
@@ -125,6 +128,7 @@ class ApiError implements Exception {
         ApiErrorCode.adminNotSupported =>
           'هذا التطبيق لأصحاب المتاجر. حساب مالك المنصة يعمل من لوحة الويب.',
         ApiErrorCode.notFound => 'غير موجود أو لم يعد متاحاً.',
+        ApiErrorCode.slotTaken => 'أُخذ هذا الوقت للتو. اختر وقتاً آخر.',
         ApiErrorCode.tenantInactive => 'المتجر غير نشط — الإرسال متوقّف.',
         ApiErrorCode.inProgress => 'الإرسال ما زال جارياً…',
         ApiErrorCode.deliveryUnknown => 'غير مؤكّد — ربما وصلت للعميل.',

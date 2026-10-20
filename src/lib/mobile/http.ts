@@ -2,6 +2,7 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { OutboundError } from "../outbound";
+import { AppointmentError } from "../appointments/errors";
 import { readCappedText } from "./body";
 
 /**
@@ -22,6 +23,7 @@ export type ApiCode =
   | "WINDOW_CLOSED"
   | "IN_PROGRESS"
   | "DELIVERY_UNKNOWN"
+  | "SLOT_TAKEN"
   | "CHANNEL_NOT_CONNECTED"
   | "TEMPLATE_INVALID"
   | "RATE_LIMITED"
@@ -38,6 +40,7 @@ const STATUS: Record<ApiCode, number> = {
   WINDOW_CLOSED: 409,
   IN_PROGRESS: 409,
   DELIVERY_UNKNOWN: 409,
+  SLOT_TAKEN: 409,
   CHANNEL_NOT_CONNECTED: 409,
   TEMPLATE_INVALID: 422,
   RATE_LIMITED: 429,
@@ -53,6 +56,7 @@ const DEFAULT_MESSAGE: Record<ApiCode, string> = {
   TENANT_INACTIVE: "المتجر موقوف أو اشتراكه منتهٍ — الإرسال معطّل حتى يُفعَّل، والقراءة تعمل",
   NOT_FOUND: "غير موجود",
   IN_PROGRESS: "الإرسال ما زال جارياً — انتظر ولا تُعِد",
+  SLOT_TAKEN: "هذا الوقت لم يعد متاحاً — اختر وقتاً آخر",
   DELIVERY_UNKNOWN: "لم تؤكّد Meta الإرسال — ربما وصلت العميل، تحقّق قبل الإعادة",
   WINDOW_CLOSED: "انتهت نافذة الرد الحرّ (٢٤ ساعة من آخر رسالة للعميل) — أرسل قالباً معتمداً",
   CHANNEL_NOT_CONNECTED: "القناة غير مربوطة لهذا المتجر",
@@ -114,6 +118,9 @@ export function toErrorResponse(err: unknown) {
         : err.message;
     return errorResponse(err.code, message);
   }
+
+  // أخطاء المواعيد رسائلها عربية آمنة للعرض، ورموزها من جدول العقد نفسه
+  if (err instanceof AppointmentError) return errorResponse(err.code, err.message);
 
   if (err instanceof z.ZodError) return errorResponse("INVALID_INPUT");
 

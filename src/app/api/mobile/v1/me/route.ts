@@ -16,7 +16,16 @@ export const GET = route(async (req) => {
     }),
     prisma.tenant.findUniqueOrThrow({
       where: { id: d.tenantId },
-      select: { id: true, slug: true, name: true, agentName: true },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        agentName: true,
+        // التطبيق يُظهر تبويب «المواعيد» بهذا وحده، ويحسب حدود اليوم بمنطقة المتجر لا الجهاز
+        appointmentsEnabled: true,
+        timezone: true,
+        currency: true,
+      },
     }),
     prisma.channelAccount.findMany({
       where: { tenantId: d.tenantId, active: true, channel: { in: [...MOBILE_CHANNELS] } },

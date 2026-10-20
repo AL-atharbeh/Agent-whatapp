@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { deleteTenant, updateProfile, updateTenant } from "../../actions";
 import { BUSINESS_TYPES } from "../../types";
 import Readiness from "../readiness";
+import AppointmentsSettings from "./appointments";
 import { SubmitButton } from "@/components/pending";
 
 export const dynamic = "force-dynamic";
@@ -213,6 +214,9 @@ export default async function SettingsForm({
           <SubmitButton>حفظ إعدادات الوكيل</SubmitButton>
         </form>
       </div>
+
+      {/* ── وحدة المواعيد: مالك المنصة فقط ── */}
+      {!portal && <AppointmentsSettings slug={slug} tenant={t} />}
 
       {/* ── حذف: مالك المنصة فقط ── */}
       {!portal && (

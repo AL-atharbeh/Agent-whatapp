@@ -42,6 +42,14 @@ int readInt(JsonMap m, String key, {int fallback = 0}) {
   return fallback;
 }
 
+/// أرقام مالية: Prisma Decimal يصل نصاً («12.50») أو رقماً حسب المسلسِل.
+double? readDoubleOrNull(JsonMap m, String key) {
+  final v = m[key];
+  if (v is num) return v.toDouble();
+  if (v is String) return double.tryParse(v.trim());
+  return null;
+}
+
 bool readBool(JsonMap m, String key, {bool fallback = false}) {
   final v = m[key];
   if (v is bool) return v;

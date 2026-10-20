@@ -1,0 +1,299 @@
+import { z } from "zod";
+import type { Channel, Customer } from "@prisma/client";
+import { prisma } from "../db";
+import type { TenantContext } from "../tenancy";
+import type { AgentTool, RunState } from "./tools";
+import {
+  AppointmentError,
+  bookAppointment,
+  cancelAppointment,
+  confirmAppointment,
+  estimateMinutes,
+  findSlots,
+  formatLocal,
+  getAppointment,
+  listServices,
+  listStaff,
+  parseLocal,
+  rescheduleAppointment,
+  sourceOfChannel,
+  upcomingFor,
+  upsertCustomerFromContact,
+} from "../appointments";
+
+/**
+ * أدوات الحجز للوكيل — تُبنى فقط لمتجر فعّل وحدة المواعيد (انظر tools.ts).
+ *
+ * العميل **دائماً** صاحب المحادثة: لا أداة تقبل معرّف عميل من النموذج. ولو
+ * «هلوس» النموذج معرّف موعد لعميل آخر، تجده الأداة لغير صاحب المحادثة
+ * فتردّه كغير موجود — فلا يُلغي عميلٌ موعد غيره بجملة ذكية.
+ *
+ * الأوقات بصيغة «YYYY-MM-DD HH:MM» بتوقيت المتجر في الاتجاهين: النموذج يخطئ
+ * في تحويل المناطق الزمنية، وخطأ ثلاث ساعات هنا موعدٌ في غير وقته.
+ *
+ * الأوصاف قصيرة عمداً: كل تعريف أداة يُرسَل مع كل رسالة.
+ */
+
+function defineTool<S extends z.ZodType>(t: {
+  name: string;
+  description: string;
+  schema: S;
+  run: (input: z.infer<S>) => Promise<string>;
+}): AgentTool {
+  return t as unknown as AgentTool;
+}
+
+const ID = z.string().min(1).max(64);
+const LOCAL = z.string().describe("YYYY-MM-DD HH:MM بتوقيت المتجر");
+const out = (o: unknown) => JSON.stringify(o);
+
+function failure(err: unknown) {
+  if (err instanceof AppointmentError) {
+    return out({
+      ok: false,
+      code: err.code,
+      reason:
+        err.code === "SLOT_TAKEN"
+          ? "الوقت لم يعد متاحاً. استدعِ find_slots واقترح غيره."
+          : err.message,
+    });
+  }
+  console.error("[agent] أداة مواعيد:", err);
+  return out({ ok: false, reason: "تعذّر الآن. اعرض التحويل لموظف." });
+}
+
+export function buildAppointmentTools(args: {
+  tenant: TenantContext;
+  channel: Channel;
+  externalUserId: string;
+  state: RunState;
+}): AgentTool[] {
+  const { tenant, channel, externalUserId, state } = args;
+  const source = sourceOfChannel(channel);
+  if (!source) return [];
+  const tz = tenant.timezone;
+
+  const log = (name: string, input: unknown, summary: string) =>
+    state.toolCalls.push({ name, input, summary });
+
+  // العميل يُحمَّل مرة في الدورة: أغلب الأدوات تحتاجه، ولا داعي لجولة لكل واحدة
+  let me: Promise<Customer> | null = null;
+  const customer = () => (me ??= upsertCustomerFromContact(tenant.id, { channel, externalUserId }));
+
+  /** موعد لهذا العميل وحده — غيره يُعامل كغير موجود */
+  const mine = async (id: string) => {
+    const c = await customer();
+    const a = await getAppointment(tenant.id, id);
+    if (a.customerId !== c.id) throw new AppointmentError("NOT_FOUND", "الموعد غير موجود");
+    return a;
+  };
+
+  const brief = (a: Awaited<ReturnType<typeof getAppointment>>) => ({
+    id: a.id,
+    service: a.service.name,
+    with: a.staff.name,
+    start: `${a.local.date} ${a.local.time}`,
+    status: a.status,
+  });
+
+  const listServicesTool = defineTool({
+    name: "list_services",
+    description: "الخدمات بأسعارها ومدتها لهذا العميل، والفريق ومن يقدّم ماذا.",
+    schema: z.object({}),
+    run: async () => {
+      try {
+        const [c, services, team] = await Promise.all([customer(), listServices(tenant.id), listStaff(tenant.id)]);
+        const minutes = await Promise.all(
+          services.map((s) => estimateMinutes(tenant.id, { serviceId: s.id, customerId: c.id })),
+        );
+        log("list_services", {}, `${services.length} خدمة`);
+        return out({
+          customer_name: c.name,
+          preferred_staff_id: c.preferredStaffId,
+          services: services.map((s, i) => ({
+            id: s.id,
+            name: s.name,
+            price_from: s.priceMin,
+            price_to: s.priceMax,
+            minutes: minutes[i].minutes,
+          })),
+          team: team.map((t) => ({ id: t.id, name: t.name, service_ids: t.serviceIds })),
+          currency: tenant.currency,
+        });
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  });
+
+  const findSlotsTool = defineTool({
+    name: "find_slots",
+    description: "حتى ٦ أوقات متاحة لخدمة في يوم. staff_id اختياري.",
+    schema: z.object({
+      service_id: ID,
+      date: z.string().describe("YYYY-MM-DD"),
+      staff_id: ID.optional(),
+      day_part: z.enum(["morning", "afternoon", "evening"]).optional(),
+    }),
+    run: async (input) => {
+      try {
+        const c = await customer();
+        const slots = await findSlots(tenant.id, {
+          serviceId: input.service_id,
+          date: input.date,
+          staffId: input.staff_id,
+          customerId: c.id,
+          dayPart: input.day_part,
+          limitPerStaff: 6,
+        });
+        // المفضّل لدى العميل أولاً، ثم الأبكر — دون أن يحتكر المفضّل القائمة
+        const pref = c.preferredStaffId;
+        const ordered = pref
+          ? [...slots.filter((s) => s.staffId === pref).slice(0, 3), ...slots.filter((s) => s.staffId !== pref)]
+          : slots;
+        const picked = ordered.slice(0, 6);
+        log("find_slots", input, `${picked.length} وقت`);
+        if (picked.length === 0) {
+          return out({ found: 0, note: "لا أوقات متاحة في هذا اليوم. اقترح يوماً آخر." });
+        }
+        return out({
+          found: picked.length,
+          slots: picked.map((s) => ({
+            staff_id: s.staffId,
+            staff_name: s.staffName,
+            start: s.local,
+            minutes: s.minutes,
+          })),
+        });
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  });
+
+  const book = defineTool({
+    name: "book_appointment",
+    description: "يحجز. فقط بعد «نعم» صريحة من العميل على الخدمة والوقت ومقدّم الخدمة.",
+    schema: z.object({ service_id: ID, staff_id: ID, start: LOCAL }),
+    run: async (input) => {
+      try {
+        const startAt = parseLocal(input.start, tz);
+        if (!startAt) return out({ ok: false, reason: "صيغة الوقت YYYY-MM-DD HH:MM" });
+        const c = await customer();
+        const a = await bookAppointment(tenant.id, {
+          customerId: c.id,
+          serviceId: input.service_id,
+          staffId: input.staff_id,
+          startAt,
+          source,
+        });
+        log("book_appointment", input, "تم الحجز");
+        return out({ ok: true, appointment: brief(a), note: "أعد تأكيد التفاصيل للعميل." });
+      } catch (err) {
+        log("book_appointment", input, "فشل الحجز");
+        return failure(err);
+      }
+    },
+  });
+
+  const myAppointments = defineTool({
+    name: "my_appointments",
+    description: "مواعيد العميل القادمة.",
+    schema: z.object({}),
+    run: async () => {
+      try {
+        const c = await customer();
+        const list = await upcomingFor(tenant.id, c.id);
+        log("my_appointments", {}, `${list.length} موعد`);
+        return out({ appointments: list.map(brief) });
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  });
+
+  const confirm = defineTool({
+    name: "confirm_appointment",
+    description: "يؤكّد موعداً للعميل (ردّه على التذكير بـ«تأكيد»).",
+    schema: z.object({ id: ID }),
+    run: async (input) => {
+      try {
+        await mine(input.id);
+        const a = await confirmAppointment(tenant.id, input.id);
+        log("confirm_appointment", input, "تأكيد");
+        return out({ ok: true, appointment: brief(a) });
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  });
+
+  const cancel = defineTool({
+    name: "cancel_appointment",
+    description: "يلغي موعداً للعميل. فقط بعد «نعم» صريحة.",
+    schema: z.object({ id: ID }),
+    run: async (input) => {
+      try {
+        await mine(input.id);
+        const a = await cancelAppointment(tenant.id, input.id);
+        log("cancel_appointment", input, "إلغاء");
+        return out({ ok: true, appointment: brief(a) });
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  });
+
+  const reschedule = defineTool({
+    name: "reschedule_appointment",
+    description: "ينقل موعداً لوقت آخر (من find_slots). فقط بعد «نعم» صريحة.",
+    schema: z.object({ id: ID, start: LOCAL, staff_id: ID.optional() }),
+    run: async (input) => {
+      try {
+        const startAt = parseLocal(input.start, tz);
+        if (!startAt) return out({ ok: false, reason: "صيغة الوقت YYYY-MM-DD HH:MM" });
+        await mine(input.id);
+        const a = await rescheduleAppointment(tenant.id, input.id, { startAt, staffId: input.staff_id });
+        log("reschedule_appointment", input, "نقل");
+        return out({ ok: true, appointment: brief(a) });
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  });
+
+  const history = defineTool({
+    name: "my_history",
+    description: "آخر زيارات العميل: الخدمة، التاريخ، مقدّم الخدمة، ملاحظات الزيارة.",
+    schema: z.object({}),
+    run: async () => {
+      try {
+        const c = await customer();
+        const rows = await prisma.appointment.findMany({
+          where: { tenantId: tenant.id, customerId: c.id, status: "DONE" },
+          orderBy: { finishedAt: "desc" },
+          take: 5,
+          select: {
+            startAt: true,
+            notes: true,
+            service: { select: { name: true } },
+            staff: { select: { name: true } },
+          },
+        });
+        log("my_history", {}, `${rows.length} زيارة`);
+        return out({
+          visits: rows.map((r) => ({
+            service: r.service.name,
+            date: formatLocal(r.startAt, tz).slice(0, 10),
+            with: r.staff.name,
+            notes: r.notes,
+          })),
+        });
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  });
+
+  return [listServicesTool, findSlotsTool, book, myAppointments, confirm, cancel, reschedule, history];
+}
