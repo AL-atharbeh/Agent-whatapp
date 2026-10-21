@@ -234,7 +234,10 @@ class _StaffHeader extends StatelessWidget {
                   style: TextStyle(fontFamily: kFont, fontSize: 14, fontWeight: FontWeight.w700, color: hc.text, height: 1.3),
                 ),
                 Text(
-                  count == 0 ? 'لا مواعيد' : arCount(count, one: 'موعد', two: 'موعدان', few: 'مواعيد'),
+                  // «لا مواعيد» كانت تُقصّ في عمود ضيّق؛ الصفر لا يحتاج كلمة
+                  count == 0 ? 'فاضي' : arCount(count, one: 'موعد', two: 'موعدان', few: 'مواعيد'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontFamily: kFont, fontSize: 11.5, color: busyNow ? hc.warn : hc.text3, height: 1.3),
                 ),
               ],
@@ -433,7 +436,8 @@ class _FreeSlot extends StatelessWidget {
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
         child: CustomPaint(
-          painter: _DashedBorderPainter(color: hc.live.withValues(alpha: 0.28)),
+          // إطار متقطّع حول كل فراغ كان يملأ الشاشة خطوطاً أكثر من المواعيد نفسها
+          painter: _DashedBorderPainter(color: hc.live.withValues(alpha: 0.10)),
           child: Align(
             alignment: AlignmentDirectional.topStart,
             child: Padding(
@@ -441,11 +445,11 @@ class _FreeSlot extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.add_rounded, size: 14, color: hc.live.withValues(alpha: 0.7)),
+                  Icon(Icons.add_rounded, size: 14, color: hc.live.withValues(alpha: 0.45)),
                   const SizedBox(width: 3),
                   Text(
                     'متاح',
-                    style: TextStyle(fontFamily: kFont, fontSize: 11, fontWeight: FontWeight.w600, color: hc.live.withValues(alpha: 0.7), height: 1.2),
+                    style: TextStyle(fontFamily: kFont, fontSize: 11, fontWeight: FontWeight.w600, color: hc.live.withValues(alpha: 0.45), height: 1.2),
                   ),
                 ],
               ),

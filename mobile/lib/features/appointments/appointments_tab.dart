@@ -10,6 +10,7 @@ import '../../data/appointments.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/glass.dart';
+import 'agenda_list.dart';
 import 'appointment_sheet.dart';
 import 'appointments_controller.dart';
 import 'appt_style.dart';
@@ -18,6 +19,16 @@ import 'manage/manage_screen.dart';
 import 'date_strip.dart';
 import 'new_appointment_screen.dart';
 import 'timeline_view.dart';
+
+/// قائمة (الافتراضي) أو خط زمني بأعمدة — اختيار الجلسة.
+final agendaListModeProvider = NotifierProvider<AgendaListMode, bool>(AgendaListMode.new);
+
+class AgendaListMode extends Notifier<bool> {
+  @override
+  bool build() => true;
+
+  void set(bool list) => state = list;
+}
 
 /// تبويب «المواعيد» — يظهر فقط حين تكون الوحدة مفعّلة للمتجر.
 class AppointmentsTab extends ConsumerWidget {
@@ -94,14 +105,14 @@ class AppointmentsTab extends ConsumerWidget {
                     label: 'الإدارة',
                     onTap: () => Navigator.of(context).push(ManageScreen.route()),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 4),
                   _GlassAction(
                     key: const Key('appts.customers'),
                     icon: Icons.people_alt_outlined,
                     label: 'العملاء',
                     onTap: () => Navigator.of(context).push(CustomersScreen.route()),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 4),
                   _GlassAction(
                     key: const Key('appts.new'),
                     icon: Icons.add_rounded,
@@ -114,7 +125,24 @@ class AppointmentsTab extends ConsumerWidget {
             ),
           ),
           DateStrip(selected: state.date, today: today, onSelect: (d) => unawaited(ctrl.selectDate(d))),
-          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: SegmentedButton<bool>(
+                key: const Key('appts.view'),
+                showSelectedIcon: false,
+                style: SegmentedButton.styleFrom(visualDensity: VisualDensity.compact),
+                segments: const [
+                  ButtonSegment(value: true, icon: Icon(Icons.view_agenda_outlined, size: 18), label: Text('قائمة')),
+                  ButtonSegment(value: false, icon: Icon(Icons.view_week_outlined, size: 18), label: Text('جدول')),
+                ],
+                selected: {ref.watch(agendaListModeProvider)},
+                onSelectionChanged: (v) => ref.read(agendaListModeProvider.notifier).set(v.first),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
           Expanded(child: _body(context, ref, state, now, bottom, openNew)),
         ],
       ),
@@ -146,7 +174,25 @@ class AppointmentsTab extends ConsumerWidget {
       return const StateMessage(
         icon: Icons.groups_2_outlined,
         title: 'لا فريق بعد',
-        body: 'أضف الخدمات والفريق وساعات الدوام من لوحة الويب — إدارتها من التطبيق غير متاحة حالياً.',
+        body: 'أضف الخدمات والفريق وساعات الدوام من زرّ «الإدارة» في الأعلى.',
+      );
+    }
+    void openSheet(Appointment a) {
+      HapticFeedback.selectionClick();
+      unawaited(showAppointmentSheet(context, a));
+    }
+
+    if (ref.watch(agendaListModeProvider)) {
+      return RefreshIndicator(
+        onRefresh: ctrl.refresh,
+        child: AgendaList(
+          key: const Key('appts.agenda'),
+          state: state,
+          now: now,
+          bottomInset: bottom,
+          onTapAppointment: openSheet,
+          onNew: () => openNew(),
+        ),
       );
     }
     return RefreshIndicator(
@@ -157,10 +203,7 @@ class AppointmentsTab extends ConsumerWidget {
         state: state,
         now: now,
         bottomInset: bottom,
-        onTapAppointment: (a) {
-          HapticFeedback.selectionClick();
-          unawaited(showAppointmentSheet(context, a));
-        },
+        onTapAppointment: openSheet,
         onTapFree: (staff, start) => openNew(staffId: staff.id, start: start),
       ),
     );
@@ -178,15 +221,33 @@ class _GlassAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hc = context.hc;
+    // أيقونة بلا كلمة كانت لغزاً: ثلاث دوائر لا يُعرف أيها «الإدارة»
     return Semantics(
       button: true,
       label: label,
       excludeSemantics: true,
       child: GestureDetector(
         onTap: onTap,
-        child: SizedBox.square(
-          dimension: 48,
-          child: Glass(shadow: false, tint: tint, child: Icon(icon, size: 22, color: hc.text)),
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: 58,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox.square(
+                dimension: 42,
+                child: Glass(shadow: false, tint: tint, child: Icon(icon, size: 21, color: hc.text)),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.fade,
+                softWrap: false,
+                style: TextStyle(fontFamily: kFont, fontSize: 11, color: hc.text2),
+              ),
+            ],
+          ),
         ),
       ),
     );

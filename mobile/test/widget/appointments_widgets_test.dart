@@ -46,6 +46,10 @@ void main() {
         await settle(t);
         expect(c.read(appointmentsVisibleProvider), isTrue);
         expect(c.read(appointmentsDayProvider.notifier).isPolling, isTrue);
+        // القائمة هي العرض الافتراضي على الجوال، والجدول بزرّ
+        expect(find.byKey(const Key('appts.agenda')), findsOneWidget);
+        await t.tap(find.text('جدول'));
+        await settle(t);
         expect(find.byKey(const Key('appts.timeline')), findsOneWidget);
         await t.tap(find.byKey(const Key('tab.0')));
         await settle(t, 2);
