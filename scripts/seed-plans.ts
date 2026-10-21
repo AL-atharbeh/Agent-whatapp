@@ -44,7 +44,7 @@ const PLANS = [
     tagline: "لمتجر يرد على عملائه في كل مكان",
     monthlyPrice: 49,
     channels: ["WHATSAPP", "MESSENGER", "INSTAGRAM", "WEB"],
-    modelId: "claude-haiku-4-5",
+    modelId: "claude-haiku-5-5",
     effort: "low",
     maxRepliesPerDay: 300,
     maxRepliesPerMinute: 30,
@@ -67,7 +67,7 @@ const PLANS = [
     tagline: "لمتجر كبير أو عدة فروع",
     monthlyPrice: 99,
     channels: ["WHATSAPP", "MESSENGER", "INSTAGRAM", "WEB"],
-    modelId: "claude-sonnet-5",
+    modelId: "claude-sonnet-5-5",
     effort: "low",
     maxRepliesPerDay: 400,
     maxRepliesPerMinute: 60,
@@ -101,9 +101,9 @@ async function main() {
   const COST: Record<string, number> = {
     "qwen/qwen3.8-27b": 0,
     "openai/gpt-oss-120b": 0,
-    "claude-haiku-4-5": 0.0035,
-    "claude-sonnet-5": 0.007,
-    "claude-opus-5": 0.0175,
+    "claude-haiku-5-5": 0.001,
+    "claude-sonnet-5-5": 0.012,
+    "claude-opus-5-5": 0.024,
   };
   const USD_TO_JOD = 0.71;
 

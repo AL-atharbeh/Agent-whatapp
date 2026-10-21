@@ -115,7 +115,7 @@ function PlanForm({ plan }: { plan?: PlanRow }) {
       <div className="grid2">
         <label>
           <span>النموذج المستخدم</span>
-          <select name="modelId" defaultValue={plan?.modelId ?? "claude-sonnet-5"}>
+          <select name="modelId" defaultValue={plan?.modelId ?? "claude-sonnet-5-5"}>
             {MODELS.map((m) => (
               <option key={m.value} value={m.value}>
                 {m.label}

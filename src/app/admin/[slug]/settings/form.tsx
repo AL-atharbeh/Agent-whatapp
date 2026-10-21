@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { deleteTenant, updateProfile, updateTenant } from "../../actions";
 import { BUSINESS_TYPES } from "../../types";
+import { MODELS } from "@/lib/plans";
 import Readiness from "../readiness";
 import AppointmentsSettings from "./appointments";
 import { SubmitButton } from "@/components/pending";
@@ -178,11 +179,18 @@ export default async function SettingsForm({
           {!portal && (
           <div className="grid3">
             <label>
-              <span>النموذج (عند استخدام Claude)</span>
+              <span>النموذج</span>
+              {/* نفس قائمة الباقات — قائمة ثابتة هنا كانت تخلو من نموذج المتجر
+                  الحالي، فيحفظ المتصفح أول خيار فيها ويُبدَّل النموذج بصمت */}
               <select name="modelId" defaultValue={t.modelId}>
-                <option value="claude-opus-5">claude-opus-5 (الأقوى)</option>
-                <option value="claude-sonnet-5">claude-sonnet-5 (أوفر)</option>
-                <option value="claude-haiku-4-5">claude-haiku-4-5 (الأسرع)</option>
+                {!MODELS.some((m) => m.value === t.modelId) && (
+                  <option value={t.modelId}>{t.modelId}</option>
+                )}
+                {MODELS.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
               </select>
             </label>
             <label>

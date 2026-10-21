@@ -14,6 +14,12 @@ import { emptyUsage, type Provider, type ProviderRequest } from "./types";
 let client: Anthropic | null = null;
 const getClient = () => (client ??= new Anthropic());
 
+/**
+ * النماذج التي تقبل `fallbacks: "default"`. Haiku لا بديل له عند الرفض، فإرسال
+ * المعامل له يعود 400 ثم نعيد الطلب بدونه — نداء ضائع وتأخير في كل رسالة.
+ */
+const SUPPORTS_FALLBACK = /^claude-(fable-5|opus-5|sonnet-5-5)/;
+
 export const anthropicProvider: Provider = {
   id: "anthropic",
 
@@ -78,10 +84,11 @@ export const anthropicProvider: Provider = {
       }
     };
 
+    const withFallback = SUPPORTS_FALLBACK.test(req.model);
     try {
-      await drive(true);
+      await drive(withFallback);
     } catch (err) {
-      if (err instanceof Anthropic.BadRequestError) {
+      if (withFallback && err instanceof Anthropic.BadRequestError) {
         console.warn("[anthropic] تعذّر تفعيل fallback، إعادة المحاولة بدونه:", err.message);
         await drive(false);
       } else {

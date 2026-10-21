@@ -97,9 +97,9 @@ export const ALL_CHANNELS: { value: Channel; label: string }[] = [
  * الاقتصادية، لا لمتجر يُجيب عن أسعار والتزامات مالية.
  */
 export const MODELS = [
-  { value: "claude-haiku-4-5", label: "Haiku — الأسرع والأوفر" },
-  { value: "claude-sonnet-5", label: "Sonnet — متوازن" },
-  { value: "claude-opus-5", label: "Opus — أعلى جودة" },
+  { value: "claude-haiku-5-5", label: "Haiku 5.5 — الأسرع والأوفر" },
+  { value: "claude-sonnet-5-5", label: "Sonnet 5.5 — متوازن" },
+  { value: "claude-opus-5-5", label: "Opus 5.5 — أعلى جودة" },
   { value: "qwen/qwen3.8-27b", label: "Qwen 27B — مجاني (Groq) · الأسرع" },
   { value: "openai/gpt-oss-120b", label: "GPT-OSS 120B — مجاني (Groq) · الأقوى" },
 ];

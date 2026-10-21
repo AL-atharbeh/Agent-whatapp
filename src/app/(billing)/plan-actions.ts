@@ -24,7 +24,7 @@ function readPlan(formData: FormData) {
     maxRepliesPerDay: n(formData.get("maxRepliesPerDay"), 200),
     maxProducts: n(formData.get("maxProducts"), 500),
     maxRepliesPerMinute: n(formData.get("maxRepliesPerMinute"), 20),
-    modelId: s(formData.get("modelId")) ?? "claude-sonnet-5",
+    modelId: s(formData.get("modelId")) ?? "claude-sonnet-5-5",
     effort: s(formData.get("effort")) ?? "low",
     // ميزة لكل سطر — أسهل للكتابة من JSON
     features: (s(formData.get("features")) ?? "")
