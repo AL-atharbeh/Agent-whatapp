@@ -15,6 +15,38 @@ import 'appt_style.dart';
 import 'customer_profile_screen.dart';
 import 'staff_avatar.dart';
 
+/// إجراء على موعد بقواعده: «خلصت» يطلب السعر والملاحظات، والإلغاء والغياب
+/// يطلبان تأكيداً. مكان واحد للورقة وبطاقات القائمة — زرّ غياب بلا تأكيد في
+/// أحدهما وحده كان سيُسجَّل خطأً بلمسة عابرة.
+Future<void> runAppointmentAction(
+  BuildContext context,
+  WidgetRef ref,
+  Appointment a,
+  ServiceOffering? service,
+  AppointmentAction action,
+) async {
+  if (action == AppointmentAction.finish) {
+    final r = await showFinishSheet(context, a, service, ref.read(currencyProvider));
+    if (r == null) return;
+    unawaited(HapticFeedback.mediumImpact());
+    final err = await ref.read(appointmentsDayProvider.notifier).act(a.id, action, finalPrice: r.price, notes: r.notes);
+    if (err != null) showToast(err);
+    return;
+  }
+  if (action == AppointmentAction.cancel || action == AppointmentAction.noShow) {
+    final ok = await _confirm(context, action);
+    if (ok != true) return;
+  }
+  unawaited(action == AppointmentAction.cancel || action == AppointmentAction.noShow
+      ? HapticFeedback.heavyImpact()
+      : HapticFeedback.mediumImpact());
+  final err = await ref.read(appointmentsDayProvider.notifier).act(a.id, action);
+  if (err != null) {
+    unawaited(HapticFeedback.vibrate());
+    showToast(err);
+  }
+}
+
 Future<void> showAppointmentSheet(BuildContext context, Appointment a) => showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -130,30 +162,7 @@ class AppointmentSheet extends ConsumerWidget {
     final primary = allowed.first;
     final rest = allowed.skip(1).toList();
 
-    Future<void> run(AppointmentAction action) async {
-      if (action == AppointmentAction.finish) {
-        final r = await showFinishSheet(context, a, service, ref.read(currencyProvider));
-        if (r == null) return;
-        unawaited(HapticFeedback.mediumImpact());
-        final err = await ref
-            .read(appointmentsDayProvider.notifier)
-            .act(a.id, action, finalPrice: r.price, notes: r.notes);
-        if (err != null) showToast(err);
-        return;
-      }
-      if (action == AppointmentAction.cancel || action == AppointmentAction.noShow) {
-        final ok = await _confirm(context, action);
-        if (ok != true) return;
-      }
-      unawaited(action == AppointmentAction.cancel || action == AppointmentAction.noShow
-          ? HapticFeedback.heavyImpact()
-          : HapticFeedback.mediumImpact());
-      final err = await ref.read(appointmentsDayProvider.notifier).act(a.id, action);
-      if (err != null) {
-        unawaited(HapticFeedback.vibrate());
-        showToast(err);
-      }
-    }
+    Future<void> run(AppointmentAction action) => runAppointmentAction(context, ref, a, service, action);
 
     return [
       FilledButton.icon(
@@ -185,26 +194,26 @@ class AppointmentSheet extends ConsumerWidget {
       ],
     ];
   }
-
-  Future<bool?> _confirm(BuildContext context, AppointmentAction action) => showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(action == AppointmentAction.cancel ? 'إلغاء الموعد؟' : 'تسجيل غياب؟'),
-          content: Text(action == AppointmentAction.cancel
-              ? 'يتحرّر الوقت فوراً لحجز آخر.'
-              : 'يُسجَّل في ملف العميل ويتحرّر الوقت. استخدمه فقط إن لم يحضر.'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('تراجع')),
-            TextButton(
-              key: const Key('confirm.yes'),
-              onPressed: () => Navigator.pop(ctx, true),
-              style: TextButton.styleFrom(foregroundColor: ctx.hc.danger),
-              child: Text(action.label),
-            ),
-          ],
-        ),
-      );
 }
+
+Future<bool?> _confirm(BuildContext context, AppointmentAction action) => showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(action == AppointmentAction.cancel ? 'إلغاء الموعد؟' : 'تسجيل غياب؟'),
+        content: Text(action == AppointmentAction.cancel
+            ? 'يتحرّر الوقت فوراً لحجز آخر.'
+            : 'يُسجَّل في ملف العميل ويتحرّر الوقت. استخدمه فقط إن لم يحضر.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('تراجع')),
+          TextButton(
+            key: const Key('confirm.yes'),
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: ctx.hc.danger),
+            child: Text(action.label),
+          ),
+        ],
+      ),
+    );
 
 typedef FinishResult = ({double? price, String? notes});
 

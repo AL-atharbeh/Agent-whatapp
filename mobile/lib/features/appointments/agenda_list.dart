@@ -1,15 +1,13 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/feedback.dart';
 import '../../core/format.dart';
 import '../../data/appointments.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets/common.dart';
+import 'appointment_sheet.dart';
 import 'appointments_controller.dart';
+import 'customer_profile_screen.dart';
 import 'appt_style.dart';
 import 'staff_avatar.dart';
 
@@ -153,23 +151,8 @@ class _AgendaCard extends ConsumerWidget {
       if (a.finalPrice != null) money(a.finalPrice!, currency) else if (service != null) priceRange(service, currency),
     ].join(' · ');
 
-    // الخطوة التالية مباشرة على البطاقة؛ «انتهى» يحتاج السعر والملاحظات فيفتح الورقة
-    final AppointmentAction? next = switch (a.status) {
-      AppointmentStatus.booked || AppointmentStatus.confirmed => AppointmentAction.start,
-      AppointmentStatus.inProgress => AppointmentAction.finish,
-      _ => null,
-    };
-
-    Future<void> quick() async {
-      if (next == AppointmentAction.finish) {
-        onTap(a);
-        return;
-      }
-      unawaited(HapticFeedback.lightImpact());
-      final err = await ref.read(appointmentsDayProvider.notifier).act(a.id, next!);
-      if (err != null) showToast(err);
-    }
-
+    // كل إجراءات الموعد على البطاقة كما في اللوحة — بلا فتح ورقة لكل خطوة
+    final actions = AppointmentAction.allowedFor(a.status);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
       child: Opacity(
@@ -217,11 +200,23 @@ class _AgendaCard extends ConsumerWidget {
                           Row(
                             children: [
                               Flexible(
-                                child: Text(
-                                  name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontFamily: kFont, fontSize: 15.5, fontWeight: FontWeight.w700, color: hc.text),
+                                // الاسم يفتح ملف العميل: زياراته وملاحظاته ومدده المتعلَّمة
+                                child: GestureDetector(
+                                  key: Key('agenda.${a.id}.customer'),
+                                  onTap: () => Navigator.of(context).push(CustomerProfileScreen.route(a.customerId)),
+                                  child: Text(
+                                    name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontFamily: kFont,
+                                      fontSize: 15.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: hc.text,
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: hc.text3,
+                                    ),
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -247,32 +242,68 @@ class _AgendaCard extends ConsumerWidget {
                               style: TextStyle(fontFamily: kFont, fontSize: 12.5, color: hc.text3),
                             ),
                           ],
+                          if (actions.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            if (pending)
+                              const SizedBox(height: 32, child: Align(alignment: AlignmentDirectional.centerStart, child: SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))))
+                            else
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  for (final act in actions)
+                                    _ActionButton(
+                                      key: Key('agenda.${a.id}.${act.wire}'),
+                                      action: act,
+                                      onTap: () => runAppointmentAction(context, ref, a, service, act),
+                                    ),
+                                ],
+                              ),
+                          ],
                         ],
                       ),
                     ),
                   ),
-                  if (next != null)
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(end: 12),
-                      child: Center(
-                        child: pending
-                            ? const SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2))
-                            : FilledButton.tonal(
-                                key: Key('agenda.${a.id}.${next.wire}'),
-                                onPressed: quick,
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                                  minimumSize: const Size(0, 38),
-                                  backgroundColor: next == AppointmentAction.finish ? hc.warnDim : hc.liveDim,
-                                  foregroundColor: next == AppointmentAction.finish ? hc.warn : hc.live,
-                                ),
-                                child: Text(next == AppointmentAction.finish ? 'انتهى' : 'بدأ'),
-                              ),
-                      ),
-                    ),
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({super.key, required this.action, required this.onTap});
+
+  final AppointmentAction action;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final hc = context.hc;
+    final (bg, fg) = switch (action) {
+      AppointmentAction.start => (hc.liveDim, hc.live),
+      AppointmentAction.finish => (hc.warnDim, hc.warn),
+      AppointmentAction.noShow || AppointmentAction.cancel => (hc.dangerDim, hc.danger),
+      AppointmentAction.confirm => (hc.surface2, hc.text),
+    };
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(R.md),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(R.md),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(actionIcon(action), size: 16, color: fg),
+              const SizedBox(width: 4),
+              Text(action.label, style: TextStyle(fontFamily: kFont, fontSize: 13, fontWeight: FontWeight.w700, color: fg)),
+            ],
           ),
         ),
       ),

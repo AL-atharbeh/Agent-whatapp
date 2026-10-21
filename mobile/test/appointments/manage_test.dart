@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hader/core/errors.dart';
 import 'package:hader/data/appointments.dart';
+import 'package:hader/features/appointments/appointments_controller.dart';
+import 'package:hader/features/appointments/appointments_tab.dart';
 import 'package:hader/features/appointments/manage/manage_screen.dart';
 import 'package:hader/features/appointments/manage/reports_screen.dart';
 import 'package:hader/features/appointments/manage/services_screen.dart';
@@ -110,6 +112,35 @@ void main() {
     });
   });
 
+  group('تبويب المواعيد على عرض iPhone', () {
+    testWidgets('أزرار الرأس الثلاثة ظاهرة بأسمائها، وكل إجراءات الموعد على بطاقته', (t) async {
+      await t.binding.setSurfaceSize(const Size(440, 956));
+      final c = testContainer(await api(), session: demoSession);
+      c.read(appointmentsVisibleProvider.notifier).set(true);
+      await t.pumpWidget(testApp(c, const Scaffold(body: AppointmentsTab())));
+      await settle(t, 12);
+
+      for (final k in ['appts.new', 'appts.customers', 'appts.manage']) {
+        expect(find.byKey(Key(k)).hitTestable(), findsOneWidget, reason: k);
+      }
+      expect(find.text('العملاء'), findsOneWidget);
+      expect(find.text('الإدارة'), findsOneWidget);
+
+      final booked = c.read(appointmentsDayProvider).items.firstWhere((a) => a.status == AppointmentStatus.booked);
+      // القائمة كسولة: البطاقة تُبنى حين تقترب من الشاشة
+      await t.scrollUntilVisible(
+        find.byKey(Key('agenda.${booked.id}')),
+        300,
+        scrollable: find.descendant(of: find.byKey(const Key('appts.agenda')), matching: find.byType(Scrollable)).first,
+      );
+      for (final act in AppointmentAction.allowedFor(AppointmentStatus.booked)) {
+        expect(find.byKey(Key('agenda.${booked.id}.${act.wire}')), findsOneWidget, reason: act.label);
+      }
+      await t.pumpWidget(const SizedBox());
+      c.dispose();
+    });
+  });
+
   group('الشاشات', () {
     testWidgets('الإدارة تفتح الخدمات والفريق والتقارير', (t) async {
       await t.binding.setSurfaceSize(const Size(440, 956));
@@ -185,3 +216,4 @@ void main() {
     });
   });
 }
+
