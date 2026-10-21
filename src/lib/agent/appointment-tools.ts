@@ -304,7 +304,8 @@ export function buildAppointmentTools(args: {
         return out({
           visits: rows.map((r) => ({
             service: r.service.name,
-            date: formatLocal(r.startAt, tz).slice(0, 10),
+            // بالساعة لا باليوم وحده: «موعد ٣:١٥» في رسالة سابقة يجب أن يُطابَق بزيارته
+            start: formatLocal(r.startAt, tz),
             with: r.staff.name,
             notes: r.notes,
           })),
