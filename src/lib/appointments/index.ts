@@ -16,6 +16,7 @@ export {
   addDays,
   dayBounds,
   formatLocal,
+  minutesOf,
   parseLocal,
   toLocal,
   zonedToUtc,

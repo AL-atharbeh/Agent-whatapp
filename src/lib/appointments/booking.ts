@@ -21,7 +21,7 @@ import {
   type Interval,
   type Processing,
 } from "./rules";
-import { dayBounds, formatLocal, isDateStr, toLocal } from "./time";
+import { dayBounds, formatLocal, isDateStr, isTimeStr, minutesOf, toLocal } from "./time";
 import { loadApptTenant, type ApptTenant } from "./tenant";
 import { listServices, listStaff, type ServiceView, type StaffView } from "./catalog";
 
@@ -284,11 +284,20 @@ export async function findSlots(
     staffId?: string | null;
     customerId?: string | null;
     dayPart?: DayPart | null;
+    /**
+     * «HH:MM» طلبه العميل — تُختار الأوقات الأقرب إليه بدل الأبكر.
+     *
+     * بدونه يقصّ limitPerStaff على أبكر الأوقات: «الساعة ٢ عند هبة» يعود
+     * بـ ١٢:٠٠–١:١٥ فقط، فيظن الوكيل أن ٢ محجوزة وهي فاضية.
+     */
+    near?: string | null;
     limitPerStaff?: number;
     now?: Date;
   },
 ): Promise<Slot[]> {
   if (!isDateStr(args.date)) throw invalid("التاريخ بصيغة YYYY-MM-DD");
+  if (args.near && !isTimeStr(args.near)) throw invalid("الوقت بصيغة HH:MM");
+  const near = args.near ? minutesOf(args.near) : null;
   const t = await loadApptTenant(tenantId);
   const now = args.now ?? new Date();
 
@@ -341,7 +350,11 @@ export async function findSlots(
       now,
     })
       .filter((d) => !args.dayPart || inDayPart(toLocal(d, t.timezone).minutes, args.dayPart))
-      .slice(0, args.limitPerStaff ?? 1000);
+      .map((d) => ({ d, gap: near === null ? 0 : Math.abs(toLocal(d, t.timezone).minutes - near) }))
+      // ترتيب ثابت: المسافة أولاً ثم الأبكر — sort مستقر فالأبكر يبقى أولاً عند التعادل
+      .sort((a, b) => a.gap - b.gap)
+      .slice(0, args.limitPerStaff ?? 1000)
+      .map((x) => x.d);
     for (const d of starts) {
       out.push({
         staffId: s.id,

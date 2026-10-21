@@ -14,6 +14,7 @@ import {
   getAppointment,
   listServices,
   listStaff,
+  minutesOf,
   parseLocal,
   rescheduleAppointment,
   sourceOfChannel,
@@ -61,6 +62,9 @@ function failure(err: unknown) {
   console.error("[agent] أداة مواعيد:", err);
   return out({ ok: false, reason: "تعذّر الآن. اعرض التحويل لموظف." });
 }
+
+/** دقائق اليوم من «YYYY-MM-DD HH:MM» */
+const minutesOfLocal = (local: string) => minutesOf(local.slice(11));
 
 export function buildAppointmentTools(args: {
   tenant: TenantContext;
@@ -128,10 +132,12 @@ export function buildAppointmentTools(args: {
 
   const findSlotsTool = defineTool({
     name: "find_slots",
-    description: "حتى ٦ أوقات متاحة لخدمة في يوم. staff_id اختياري.",
+    description:
+      "حتى ٦ أوقات متاحة لخدمة في يوم. staff_id اختياري. إن طلب العميل ساعة بعينها فمرّرها في time لتعود الأوقات الأقرب لها، وrequested_available يقول إن كانت هي نفسها متاحة.",
     schema: z.object({
       service_id: ID,
       date: z.string().describe("YYYY-MM-DD"),
+      time: z.string().optional().describe("HH:MM بتوقيت المتجر"),
       staff_id: ID.optional(),
       day_part: z.enum(["morning", "afternoon", "evening"]).optional(),
     }),
@@ -144,6 +150,7 @@ export function buildAppointmentTools(args: {
           staffId: input.staff_id,
           customerId: c.id,
           dayPart: input.day_part,
+          near: input.time,
           limitPerStaff: 6,
         });
         // المفضّل لدى العميل أولاً، ثم الأبكر — دون أن يحتكر المفضّل القائمة
@@ -151,13 +158,19 @@ export function buildAppointmentTools(args: {
         const ordered = pref
           ? [...slots.filter((s) => s.staffId === pref).slice(0, 3), ...slots.filter((s) => s.staffId !== pref)]
           : slots;
-        const picked = ordered.slice(0, 6);
+        // مع وقت مطلوب: الأقرب له عبر الفريق كله، لا الأبكر — ثم يُعرض بترتيب الوقت
+        const gap = (s: (typeof slots)[number]) =>
+          input.time ? Math.abs(minutesOfLocal(s.local) - minutesOf(input.time)) : 0;
+        const picked = (input.time ? [...ordered].sort((a, b) => gap(a) - gap(b)) : ordered)
+          .slice(0, 6)
+          .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
         log("find_slots", input, `${picked.length} وقت`);
         if (picked.length === 0) {
           return out({ found: 0, note: "لا أوقات متاحة في هذا اليوم. اقترح يوماً آخر." });
         }
         return out({
           found: picked.length,
+          ...(input.time ? { requested_available: picked.some((s) => gap(s) === 0) } : {}),
           slots: picked.map((s) => ({
             staff_id: s.staffId,
             staff_name: s.staffName,
