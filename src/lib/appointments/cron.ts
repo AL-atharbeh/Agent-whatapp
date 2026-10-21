@@ -106,9 +106,11 @@ export async function runForTenant(t: ApptTenant, now: Date): Promise<TenantCron
   });
 
   // ── التذكير بمواعيد الغد ──
+  // نص حرّ إن كانت نافذة العميل مفتوحة، وإلا القالب. كان التذكير كله يُتخطّى
+  // بلا قالب مضبوط — فلا يصل شيء حتى لمن راسل المتجر قبل ساعات ونافذته مفتوحة.
   await step(r, "reminder", async () => {
     const local = toLocal(now, t.timezone);
-    if (!s.reminderTemplate || !reminderDue(local.minutes, s.reminderHour)) return;
+    if (!reminderDue(local.minutes, s.reminderHour)) return;
     const { start, end } = dayBounds(addDays(local.date, 1), t.timezone);
     const rows = await prisma.appointment.findMany({
       where: { tenantId: t.id, status: "BOOKED", reminderSentAt: null, startAt: { gte: start, lt: end } },
@@ -116,37 +118,68 @@ export async function runForTenant(t: ApptTenant, now: Date): Promise<TenantCron
         id: true,
         customerId: true,
         startAt: true,
+        notes: true,
         customer: { select: { name: true } },
         service: { select: { name: true } },
         staff: { select: { name: true } },
       },
+      orderBy: { startAt: "asc" },
     });
-    for (const a of rows) {
-      const claim = await prisma.appointment.updateMany({
-        where: { id: a.id, tenantId: t.id, reminderSentAt: null, status: "BOOKED" },
-        data: { reminderSentAt: now },
-      });
-      if (claim.count === 0) continue;
-      const l = toLocal(a.startAt, t.timezone);
+
+    // رسالة واحدة لكل عميل بكل مواعيده: ثلاث رسائل متتالية لنفس الشخص إزعاج
+    const byCustomer = new Map<string, typeof rows>();
+    for (const a of rows) byCustomer.set(a.customerId, [...(byCustomer.get(a.customerId) ?? []), a]);
+
+    for (const [customerId, list] of byCustomer) {
+      const claimed: typeof rows = [];
+      for (const a of list) {
+        const c = await prisma.appointment.updateMany({
+          where: { id: a.id, tenantId: t.id, reminderSentAt: null, status: "BOOKED" },
+          data: { reminderSentAt: now },
+        });
+        if (c.count === 1) claimed.push(a);
+      }
+      if (claimed.length === 0) continue;
+
+      const first = claimed[0];
+      const l = toLocal(first.startAt, t.timezone);
+      const line = (a: (typeof rows)[number]) =>
+        `${toLocal(a.startAt, t.timezone).time} — ${a.service.name} مع ${a.staff.name}` +
+        (a.notes?.startsWith("الحجز لـ") ? ` (${a.notes})` : "");
+      const name = first.customer.name;
+      const text =
+        `${name ? `أهلاً ${name}، ` : ""}` +
+        (claimed.length === 1
+          ? `تذكير بموعدك بكرا: ${line(first)}.`
+          : `تذكير بمواعيدك بكرا:\n${claimed.map((a) => `• ${line(a)}`).join("\n")}`) +
+        `\nللتأكيد ردّ «تأكيد»، ولو بدك تلغي أو تأجّل خبّرنا.`;
+
       const outcome = await messenger.send({
-        customerId: a.customerId,
+        customerId,
+        text,
         template: {
           name: s.reminderTemplate,
           vars: (n) =>
             templateVars(
-              { customer: a.customer.name ?? "", service: a.service.name, time: l.time, date: l.date, staff: a.staff.name },
+              { customer: name ?? "", service: first.service.name, time: l.time, date: l.date, staff: first.staff.name },
               n,
             ),
         },
         now,
       });
-      if (outcome === "sent" || outcome === "unknown") r.reminders++;
+      if (outcome === "sent" || outcome === "unknown") r.reminders += claimed.length;
+      // لا نافذة ولا قالب: يُعاد الحجز فتُحاوَل الدورة القادمة (قالب ضُبط، أو راسل العميل)
+      if (outcome === "skipped") {
+        await prisma.appointment.updateMany({
+          where: { id: { in: claimed.map((a) => a.id) }, tenantId: t.id, reminderSentAt: now },
+          data: { reminderSentAt: null },
+        });
+      }
     }
   });
 
   // ── العودة ──
   await step(r, "rebook", async () => {
-    if (!s.rebookTemplate) return;
     const services = await prisma.service.findMany({
       where: { tenantId: t.id, rebookAfterDays: { not: null } },
       select: { id: true, rebookAfterDays: true },
@@ -217,6 +250,10 @@ export async function runForTenant(t: ApptTenant, now: Date): Promise<TenantCron
       const l = toLocal(a.finishedAt!, t.timezone);
       const outcome = await messenger.send({
         customerId: a.customerId,
+        text:
+          `${a.customer.name ? `أهلاً ${a.customer.name}، ` : ""}صار وقت ${a.service.name} من جديد 🙂 ` +
+          `آخر مرة كانت بتاريخ ${l.date} مع ${a.staff.name}. ` +
+          `بتحب نحجزلك موعد؟ قلّنا اليوم والوقت اللي بناسبك.`,
         template: {
           name: s.rebookTemplate,
           vars: (n) =>
@@ -228,6 +265,12 @@ export async function runForTenant(t: ApptTenant, now: Date): Promise<TenantCron
         now,
       });
       if (outcome === "sent" || outcome === "unknown") r.rebooks++;
+      if (outcome === "skipped") {
+        await prisma.appointment.updateMany({
+          where: { id: a.id, tenantId: t.id, rebookSentAt: now },
+          data: { rebookSentAt: null },
+        });
+      }
     }
   });
 
