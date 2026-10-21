@@ -107,6 +107,8 @@ class SessionStore {
   static const _sessionKey = 'hader.session';
   static const _lockEnabledKey = 'hader.lock.enabled';
   static const _lockTimeoutKey = 'hader.lock.timeout';
+  static const _lockPinKey = 'hader.lock.pin';
+  static const _lockFailsKey = 'hader.lock.fails';
 
   Future<Session?> read() async {
     try {
@@ -150,12 +152,41 @@ class SessionStore {
     await _kv.write(_lockTimeoutKey, '${s.timeoutMinutes}');
   }
 
+  /// رمز القفل مجزّأً («v1:ملح:بصمة») — الرمز نفسه لا يُخزَّن أبداً.
+  Future<String?> readPinHash() async {
+    try {
+      return await _kv.read(_lockPinKey);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> writePinHash(String? hash) =>
+      hash == null ? _kv.delete(_lockPinKey) : _kv.write(_lockPinKey, hash);
+
+  /// المحاولات الفاشلة ووقت انتهاء الإيقاف — في التخزين لا في الذاكرة، وإلا
+  /// صار إغلاق التطبيق وفتحه طريقاً لتصفير العدّاد وتجربة رموز بلا حدّ.
+  Future<({int fails, DateTime? until})> readPinFails() async {
+    try {
+      final raw = await _kv.read(_lockFailsKey);
+      final parts = (raw ?? '').split('|');
+      final fails = int.tryParse(parts.first) ?? 0;
+      final until = parts.length > 1 ? DateTime.tryParse(parts[1]) : null;
+      return (fails: fails, until: until);
+    } catch (_) {
+      return (fails: 0, until: null);
+    }
+  }
+
+  Future<void> writePinFails(int fails, DateTime? until) =>
+      _kv.write(_lockFailsKey, '$fails|${until?.toUtc().toIso8601String() ?? ''}');
+
   /// يمحو كل ما في التخزين الآمن — يُستدعى عند تثبيت جديد.
   ///
   /// Keychain في iOS **يبقى بعد حذف التطبيق**؛ بدون هذا، من يثبّت التطبيق
   /// من جديد (أو يشتري هاتفاً مستعملاً لم يُمسح) يجد جلسة المالك السابق.
   Future<void> wipeAll() async {
-    for (final k in [_sessionKey, _lockEnabledKey, _lockTimeoutKey]) {
+    for (final k in [_sessionKey, _lockEnabledKey, _lockTimeoutKey, _lockPinKey, _lockFailsKey]) {
       try {
         await _kv.delete(k);
       } catch (_) {}

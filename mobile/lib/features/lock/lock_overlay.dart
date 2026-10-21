@@ -3,9 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/format.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets/glyphs.dart';
 import 'app_lock_controller.dart';
+import 'biometric_auth.dart';
+import 'pin_pad.dart';
 
 /// يلفّ التطبيق كله: شاشة قفل حين يكون مقفلاً، وغطاء خصوصية حين يغادر
 /// المقدّمة (لقطة «التطبيقات الأخيرة» تُلتقط في تلك اللحظة).
@@ -79,37 +82,109 @@ class _LockScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hc = context.hc;
     final tt = Theme.of(context).textTheme;
-    final busy = ref.watch(appLockProvider.select((s) => s.authenticating));
+    final lock = ref.watch(appLockProvider);
+    final ctrl = ref.read(appLockProvider.notifier);
     return Scaffold(
       key: const Key('lock.screen'),
+      backgroundColor: hc.bg,
       body: SafeArea(
         child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const BrandMark(size: 72),
-                const SizedBox(height: 24),
-                Text('حاضر مقفل', style: tt.headlineSmall),
-                const SizedBox(height: 8),
+                const BrandMark(size: 64),
+                const SizedBox(height: 18),
+                Text('حاضر مقفل', style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
                 Text(
-                  'تحقّق من هويتك لعرض محادثات عملائك.',
+                  lock.hasPin ? 'أدخل رمز حاضر أو استخدم البصمة' : 'تحقّق من هويتك لعرض محادثات عملائك.',
                   textAlign: TextAlign.center,
                   style: tt.bodyMedium?.copyWith(color: hc.text2),
                 ),
-                const SizedBox(height: 32),
-                FilledButton.icon(
-                  key: const Key('lock.unlock'),
-                  onPressed: busy ? null : () => ref.read(appLockProvider.notifier).unlock(),
-                  icon: const Icon(Icons.fingerprint_rounded),
-                  label: const Text('فتح القفل'),
-                ),
+                const SizedBox(height: 36),
+                if (lock.hasPin)
+                  PinEntry(
+                    onPin: ctrl.unlockWithPin,
+                    onBiometric: lock.biometric == BiometricKind.none ? null : () => unawaited(ctrl.unlock()),
+                  )
+                else
+                  FilledButton.icon(
+                    key: const Key('lock.unlock'),
+                    onPressed: lock.authenticating ? null : () => ctrl.unlock(),
+                    icon: const Icon(Icons.fingerprint_rounded),
+                    label: const Text('فتح القفل'),
+                  ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// [PinPad] مع رسالة الخطأ والإيقاف المؤقت بعدّاد حيّ — مشترك بين شاشة القفل
+/// وتأكيد الهوية في الإعدادات.
+class PinEntry extends ConsumerStatefulWidget {
+  const PinEntry({super.key, required this.onPin, this.onBiometric});
+
+  final Future<PinResult> Function(String pin) onPin;
+  final VoidCallback? onBiometric;
+
+  @override
+  ConsumerState<PinEntry> createState() => _PinEntryState();
+}
+
+class _PinEntryState extends ConsumerState<PinEntry> {
+  Timer? _tick;
+  bool _wrong = false;
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  void _countdown() {
+    _tick?.cancel();
+    _tick = Timer.periodic(const Duration(seconds: 1), (t) {
+      final until = ref.read(appLockProvider).lockedUntil;
+      if (!mounted) return t.cancel();
+      setState(() {});
+      if (until == null || DateTime.now().isAfter(until)) t.cancel();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lock = ref.watch(appLockProvider);
+    final until = lock.lockedUntil;
+    final remaining = until == null ? 0 : until.difference(DateTime.now()).inSeconds + 1;
+    final lockedOut = remaining > 0;
+    if (lockedOut && (_tick == null || !_tick!.isActive)) _countdown();
+
+    final String? message;
+    if (lockedOut) {
+      message = 'محاولات كثيرة — حاول بعد ${arDigits(remaining)} ثانية';
+    } else if (_wrong) {
+      message = 'رمز غير صحيح';
+    } else {
+      message = null;
+    }
+
+    return PinPad(
+      enabled: !lockedOut,
+      biometric: lock.biometric,
+      onBiometric: widget.onBiometric,
+      message: message,
+      messageIsError: _wrong || lockedOut,
+      onComplete: (pin) async {
+        final r = await widget.onPin(pin);
+        if (mounted) setState(() => _wrong = r != PinResult.ok);
+        return r == PinResult.ok;
+      },
     );
   }
 }

@@ -114,7 +114,7 @@ packages:
     source: hosted
     version: "0.3.5+5"
   crypto:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: crypto
       sha256: c8ea0233063ba03258fbcf2ca4d6dadfefe14f02fab57702265467a19f27fadf
@@ -550,7 +550,7 @@ packages:
     source: hosted
     version: "2.3.0"
   local_auth_darwin:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: local_auth_darwin
       sha256: b1b2d938cc3511512e552d92e782e055b8dc29c83e21c59e6ecfc6bd79ab0744

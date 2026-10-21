@@ -12,6 +12,7 @@ import '../../data/models.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets/common.dart';
 import '../lock/app_lock_controller.dart';
+import '../lock/pin_screens.dart';
 import '../push/push_service.dart';
 import 'notify_controller.dart';
 
@@ -86,18 +87,47 @@ class SettingsTab extends ConsumerWidget {
                   onChanged: lock.authenticating
                       ? null
                       : (v) async {
-                          final err = await ref.read(appLockProvider.notifier).setEnabled(v);
-                          if (err != null) showToast(err);
+                          final ctrl = ref.read(appLockProvider.notifier);
+                          if (v) {
+                            // التفعيل = اختيار رمز حاضر؛ البصمة تُستعمل تلقائياً إن وُجدت
+                            await Navigator.of(context).push(PinSetupScreen.route());
+                            return;
+                          }
+                          // التعطيل بعد تأكيد الهوية — كي لا يعطّله من التقط الهاتف مفتوحاً
+                          final ok = lock.hasPin
+                              ? await Navigator.of(context).push(PinVerifyScreen.route('إيقاف قفل التطبيق')) == true
+                              : await ref.read(biometricAuthProvider).authenticateWithDevice('أكّد هويتك لإيقاف قفل التطبيق');
+                          if (!ok) {
+                            showToast('لم يتم التحقق. لم يتغيّر شيء.');
+                            return;
+                          }
+                          await ctrl.disable();
                         },
                   contentPadding: const EdgeInsetsDirectional.fromSTEB(16, 6, 12, 6),
                   secondary: _IconBox(Icons.fingerprint_rounded, color: hc.live),
                   title: const Text('قفل التطبيق'),
                   subtitle: Text(
-                    'بصمة الوجه أو الإصبع عند الفتح، وإخفاء المحادثات في قائمة التطبيقات.',
+                    'بصمة الوجه أو الإصبع عند الفتح، ورمز حاضر بديلاً، وإخفاء المحادثات في قائمة التطبيقات.',
                     style: tt.bodySmall,
                   ),
                 ),
                 if (lock.settings.enabled) ...[
+                  Divider(indent: 68, color: hc.border),
+                  ListTile(
+                    key: const Key('settings.lock.changePin'),
+                    contentPadding: const EdgeInsetsDirectional.fromSTEB(16, 2, 12, 2),
+                    leading: _IconBox(Icons.dialpad_rounded, color: hc.text2),
+                    title: Text(lock.hasPin ? 'تغيير رمز حاضر' : 'إنشاء رمز حاضر'),
+                    subtitle: Text('بديل البصمة حين لا تعمل', style: tt.bodySmall),
+                    trailing: const Icon(Icons.chevron_left_rounded),
+                    onTap: () async {
+                      if (lock.hasPin &&
+                          await Navigator.of(context).push(PinVerifyScreen.route('تغيير رمز حاضر')) != true) {
+                        return;
+                      }
+                      if (context.mounted) await Navigator.of(context).push(PinSetupScreen.route());
+                    },
+                  ),
                   Divider(indent: 68, color: hc.border),
                   Padding(
                     padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 14),
