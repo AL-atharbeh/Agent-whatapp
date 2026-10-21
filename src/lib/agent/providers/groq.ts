@@ -34,19 +34,33 @@ const getClient = () =>
     timeout: 25_000,
   }));
 
-/** ثانية واحدة تكفي لابتلاع تزاحم عابر؛ ما بعدها نفاد سعة حقيقي. */
-const BRIEF_RETRY_MS = 1_000;
+/**
+ * أطول انتظار نقبله داخل المحادثة قبل أن نعلن نفاد السعة.
+ *
+ * الحصّة تُقاس بالتوكنات في الدقيقة، ودورة حجز واحدة (اقتراح أوقات ثم حجز)
+ * تستهلك ثلاث أو أربع نداءات بتعليمات كاملة في كل منها — فتنفد الحصّة في
+ * منتصف الدورة وتتجدّد بعد ثوانٍ. الاستسلام هنا كان يحوّل المحادثة لموظف
+ * ويقطع الحجز من أجل انتظار قصير؛ ردّ متأخّر بنصف دقيقة أهون من حجز ضائع.
+ * ما يتجاوزها نفاد حقيقي: الحصّة اليومية أو ضغط متواصل.
+ */
+const MAX_WAIT_MS = 30_000;
 
+/**
+ * ثواني الانتظار من رأس الرد. `retry-after` رقم ثوانٍ، أما رأس الحصّة فمدّة
+ * مثل «7m12s» — قراءتها بـ parseFloat تعطي ٧ ثوانٍ بدل ٤٣٢، فننتظر ثم نفشل.
+ */
 function retryAfter(err: unknown): number | null {
   const h = (err as { headers?: Record<string, string> })?.headers;
-  const v = h?.["retry-after"] ?? h?.["x-ratelimit-reset-tokens"];
+  const v = String(h?.["retry-after"] ?? h?.["x-ratelimit-reset-tokens"] ?? "").trim();
   if (!v) return null;
-  const n = parseFloat(String(v));
-  return Number.isFinite(n) ? n : null;
+  if (/^\d+(\.\d+)?$/.test(v)) return Number(v);
+  const m = v.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s)?$/);
+  if (!m || !(m[1] || m[2] || m[3])) return null;
+  return Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0);
 }
 
 /**
- * نداء واحد للنموذج، مع محاولة ثانية قصيرة عند التزاحم فقط.
+ * نداء واحد للنموذج، مع محاولة ثانية بعد انتظار التجديد عند التزاحم فقط.
  *
  * نميّز `429` عن بقية الأخطاء: الأولى سعة نفدت والثانية عطل. ودمجهما تحت
  * «خطأ تقني» يُخفي عن صاحب المتجر أن باقته هي ما ضاق، لا أن النظام معطوب.
@@ -60,10 +74,11 @@ async function callOnce(
     if ((err as { status?: number })?.status !== 429) throw err;
 
     const wait = retryAfter(err);
-    if (wait !== null && wait * 1000 > BRIEF_RETRY_MS) {
+    if (wait !== null && wait * 1000 > MAX_WAIT_MS) {
       throw new CapacityError("groq", wait);
     }
-    await new Promise((r) => setTimeout(r, BRIEF_RETRY_MS));
+    // الرأس يقول متى تتجدّد الحصّة؛ بدونه ثانيتان تكفيان لتزاحم عابر
+    await new Promise((r) => setTimeout(r, wait !== null ? wait * 1000 + 250 : 2_000));
     try {
       return await create();
     } catch (err2) {
