@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { authorizeTenant, requireAdmin } from "@/lib/session";
+import { authorizeTenant } from "@/lib/session";
 import {
   WEEKDAYS,
   bookAppointment,
@@ -142,15 +142,20 @@ const settingsSchema = z.object({
 });
 
 /**
- * إعدادات المواعيد. الحدود نفسها التي يطبّقها settingsOf عند القراءة — قيمة
- * خارجها كانت ستُحفظ ثم تُهمَل بصمت، فيظن مالك المنصة أنه ضبط ما لم يُضبط.
+ * إعدادات المواعيد — لمالك المنصة ولصاحب النشاط. الحدود نفسها التي يطبّقها
+ * settingsOf عند القراءة — قيمة خارجها كانت ستُحفظ ثم تُهمَل بصمت، فيظن من
+ * ضبطها أنه ضبط ما لم يُضبط.
+ *
+ * التفعيل نفسه ليس هنا: setAppointmentsEnabled لمالك المنصة وحده، وحفظ
+ * الضبط لمتجر مطفأ مرفوض حتى لا تصير البوابة طريقاً خلفياً لتشغيل الوحدة.
  */
 export async function saveAppointmentSettings(formData: FormData) {
   const slug = s(formData.get("slug")) ?? "";
-  const path = `/admin/${slug}`;
+  const path = s(formData.get("portal")) ? "/app/business" : `/admin/${slug}`;
   try {
-    await requireAdmin();
     const tenantId = await authorizeTenant(slug);
+    const t = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { appointmentsEnabled: true } });
+    if (!t.appointmentsEnabled) throw new Error("وحدة المواعيد غير مفعّلة لهذا المتجر");
     const v = settingsSchema.parse({
       slotStepMinutes: num(formData.get("slotStepMinutes")),
       bufferMinutes: num(formData.get("bufferMinutes")),

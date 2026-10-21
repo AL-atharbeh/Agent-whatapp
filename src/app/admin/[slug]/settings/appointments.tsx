@@ -7,11 +7,12 @@ import { ActionError } from "@/components/action-error";
 import { SubmitButton } from "@/components/pending";
 
 /**
- * وحدة المواعيد في إعدادات المتجر — لمالك المنصة وحده.
+ * وحدة المواعيد في إعدادات المتجر.
  *
  * الوحدة اختيارية لأي نشاط بالمواعيد (عيادة، مركز صيانة، صالون…). التفعيل
  * يضيف للوكيل ثماني أدوات وتعليمات في كل رسالة، ويشغّل رسائل تذكير لعملاء
- * المتجر باسمه — قرار بكلفة، فهو هنا لا في بوابة صاحب المتجر.
+ * المتجر باسمه — قرار بكلفة، فزرّ التفعيل لمالك المنصة وحده. أما الضبط (ساعة
+ * التذكير، القوالب، الغياب) فعمل صاحب النشاط اليومي، فيراه في بوابته متى فُعّلت.
  *
  * ساعة التذكير بتوقيت المتجر لا الخادم ولا المتصفح: مالك المنصة قد يكون في
  * بلد آخر، والرقم الذي يكتبه هو ما ستراه ساعة العميل.
@@ -19,9 +20,12 @@ import { SubmitButton } from "@/components/pending";
 export default function AppointmentsSettings({
   slug,
   tenant,
+  portal = false,
 }: {
   slug: string;
   tenant: { appointmentsEnabled: boolean; appointmentSettings: unknown; timezone: string };
+  /** بوابة صاحب النشاط: الضبط فقط، بلا زرّ التفعيل والإطفاء. */
+  portal?: boolean;
 }) {
   const s = settingsOf(tenant);
   const tz = safeTz(tenant.timezone);
@@ -40,6 +44,7 @@ export default function AppointmentsSettings({
             {tenant.appointmentsEnabled ? "مفعّلة" : "مطفأة"}
           </span>
         </h3>
+        {!portal && (
         <form action={setAppointmentsEnabled}>
           <input type="hidden" name="slug" value={slug} />
           <input type="hidden" name="enabled" value={tenant.appointmentsEnabled ? "false" : "true"} />
@@ -47,6 +52,7 @@ export default function AppointmentsSettings({
             {tenant.appointmentsEnabled ? "إطفاء الوحدة" : "تفعيل الوحدة"}
           </SubmitButton>
         </form>
+        )}
       </div>
       <p className="hint">
         لأي نشاط يعمل بالمواعيد: حجز عبر الوكيل، جدول يومي للفريق، تذكير وتنبيه تأخير، ومدة
@@ -55,7 +61,7 @@ export default function AppointmentsSettings({
         {tenant.appointmentsEnabled && (
           <>
             {" "}
-            <Link href={`/admin/${slug}/appointments`}>افتح المواعيد ←</Link>
+            <Link href={portal ? "/app/appointments" : `/admin/${slug}/appointments`}>افتح المواعيد ←</Link>
           </>
         )}
       </p>
@@ -63,6 +69,7 @@ export default function AppointmentsSettings({
       {tenant.appointmentsEnabled && (
         <form action={saveAppointmentSettings}>
           <input type="hidden" name="slug" value={slug} />
+          {portal && <input type="hidden" name="portal" value="1" />}
           <div className="grid3">
             <label>
               <span>دقّة اقتراح الأوقات (دقيقة)</span>

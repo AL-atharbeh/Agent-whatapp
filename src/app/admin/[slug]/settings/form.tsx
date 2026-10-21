@@ -215,8 +215,8 @@ export default async function SettingsForm({
         </form>
       </div>
 
-      {/* ── وحدة المواعيد: مالك المنصة فقط ── */}
-      {!portal && <AppointmentsSettings slug={slug} tenant={t} />}
+      {/* ── وحدة المواعيد: التفعيل لمالك المنصة، وضبطها لصاحب النشاط متى فُعّلت ── */}
+      {(!portal || t.appointmentsEnabled) && <AppointmentsSettings slug={slug} tenant={t} portal={portal} />}
 
       {/* ── حذف: مالك المنصة فقط ── */}
       {!portal && (

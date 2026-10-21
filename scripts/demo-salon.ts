@@ -12,6 +12,7 @@ import { toAscii } from "./prompt";
  * وحدة المواعيد — من رقم واتساب حقيقي.
  *
  *   npm run demo:salon                         ← يسأل عن المتجر ورقم التجربة
+ *   npm run demo:salon -- --empty              ← يفرّغ المتجر لتعبئته بنفسك كصالون
  *   npm run demo:salon -- --restore <ملف>      ← يعيد المتجر كما كان
  *
  * قبل أي تغيير يحفظ محتوى المتجر كاملاً في backups/ (خارج git): البيانات
@@ -124,6 +125,7 @@ async function main() {
   try {
     const ri = args.indexOf("--restore");
     if (ri >= 0) return await restore(rl, args[ri + 1]);
+    if (args.includes("--empty")) return await empty(rl);
     await seed(rl);
   } finally {
     rl.close();
@@ -161,7 +163,7 @@ async function askPhone(rl: readline.Interface, q: string, locale: string, optio
 //  النسخة الاحتياطية
 // ═══════════════════════════════════════════════════════════
 
-async function backup(tenantId: string, slug: string): Promise<string> {
+async function backup(tenantId: string, slug: string, withConversations = false): Promise<string> {
   const [tenant, profile, products, faqs, dataSources, services, staff, staffServices, customers, contacts, appointments] =
     await Promise.all([
       prisma.tenant.findUniqueOrThrow({
@@ -190,6 +192,14 @@ async function backup(tenantId: string, slug: string): Promise<string> {
     tenant, profile, products, faqs, dataSources, services,
     staff: staff.map((s) => ({ ...s, photo: s.photo ? Buffer.from(s.photo).toString("base64") : null })),
     staffServices, customers, contacts, appointments,
+    // تُحفظ فقط حين تُمحى — وإلا أعاد الإرجاع محادثات قديمة فوق ما وصل بعدها
+    ...(withConversations
+      ? {
+          conversations: await prisma.conversation.findMany({ where: { tenantId } }),
+          messages: await prisma.message.findMany({ where: { tenantId } }),
+          leads: await prisma.lead.findMany({ where: { tenantId } }),
+        }
+      : {}),
   };
   mkdirSync("backups", { recursive: true });
   const file = `backups/${slug}-${data.savedAt.replace(/[:.]/g, "-")}.json`;
@@ -205,6 +215,13 @@ async function wipeAppointments(tx: Prisma.TransactionClient, tenantId: string) 
   await tx.staffService.deleteMany({ where: { staff: { tenantId } } });
   await tx.staff.deleteMany({ where: { tenantId } });
   await tx.service.deleteMany({ where: { tenantId } });
+}
+
+/** المحادثات ورسائلها والعملاء المحتملون — الحجوزات أولاً فهي تشير للرسائل بلا قيد على المتجر. */
+async function wipeConversations(tx: Prisma.TransactionClient, tenantId: string) {
+  await tx.outboundRequest.deleteMany({ where: { tenantId } });
+  await tx.conversation.deleteMany({ where: { tenantId } });
+  await tx.lead.deleteMany({ where: { tenantId } });
 }
 
 const json = (v: unknown) => (v === null || v === undefined ? Prisma.DbNull : (v as Prisma.InputJsonValue));
@@ -471,6 +488,71 @@ async function seed(rl: readline.Interface) {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  التفريغ — المتجر نفسه يبقى، ومحتواه يُعبّأ يدوياً من اللوحة
+// ═══════════════════════════════════════════════════════════
+
+async function empty(rl: readline.Interface) {
+  const t = await pickTenant(rl);
+  const prev = await prisma.tenant.findUniqueOrThrow({ where: { id: t.id }, select: { appointmentSettings: true } });
+
+  console.log(`\nسيُفرَّغ «${t.name}»: البيانات والتعليمات والمنتجات والأسئلة ومصادر البيانات`);
+  console.log("والخدمات والفريق والعملاء والمواعيد، وتُفعَّل وحدة المواعيد كصالون.");
+  console.log("يبقى: الرابط والقنوات (الواتساب) والمستخدمون والاشتراك واسم المتجر.");
+  console.log("قبل أي تغيير تُحفظ نسخة كاملة في مجلد backups/.\n");
+
+  // الوكيل يقرأ تاريخ المحادثة — محادثة قديمة عن منتجات الشركة تخلط تجربة الصالون
+  const withConversations =
+    (await rl.question("تمسح المحادثات والعملاء المحتملين كمان؟ (نعم/لا) [نعم]: ")).trim() !== "لا";
+
+  const ok = (await rl.question(`\nاكتب «نعم» للمتابعة على ${t.slug}: `)).trim();
+  if (ok !== "نعم") {
+    console.log("أُلغي — لم يتغيّر شيء.");
+    return;
+  }
+
+  const file = await backup(t.id, t.slug, withConversations);
+  console.log(`\n💾 النسخة الاحتياطية: ${file}`);
+
+  const o =
+    prev.appointmentSettings && typeof prev.appointmentSettings === "object" && !Array.isArray(prev.appointmentSettings)
+      ? (prev.appointmentSettings as Record<string, unknown>)
+      : {};
+
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.tenant.update({
+        where: { id: t.id },
+        data: {
+          businessType: "beauty",
+          // افتراضيات الجدول نفسها — كأن المتجر جديد
+          agentName: "المساعد",
+          tone: "ودّي ومهذب، جمل قصيرة، بدون مبالغة",
+          customPolicy: null,
+          handoffKeywords: [],
+          appointmentsEnabled: true,
+          // أسماء قوالب واتساب المعتمدة عند ميتا تبقى — إنشاؤها يأخذ أياماً
+          appointmentSettings: {
+            reminderTemplate: o.reminderTemplate ?? null,
+            delayTemplate: o.delayTemplate ?? null,
+            rebookTemplate: o.rebookTemplate ?? null,
+          },
+        },
+      });
+      await tx.businessProfile.deleteMany({ where: { tenantId: t.id } });
+      await tx.product.deleteMany({ where: { tenantId: t.id } });
+      await tx.faq.deleteMany({ where: { tenantId: t.id } });
+      await tx.dataSource.deleteMany({ where: { tenantId: t.id } });
+      await wipeAppointments(tx, t.id);
+      if (withConversations) await wipeConversations(tx, t.id);
+    },
+    { timeout: 180_000, maxWait: 20_000 },
+  );
+
+  console.log(`\n✅ «${t.name}» فارغ الآن — عبّئه من اللوحة أو التطبيق.`);
+  console.log(`\nللرجوع: npm run demo:salon -- --restore ${file}\n`);
+}
+
+// ═══════════════════════════════════════════════════════════
 //  الإرجاع
 // ═══════════════════════════════════════════════════════════
 
@@ -518,6 +600,16 @@ async function restore(rl: readline.Interface, file: string | undefined) {
       if (b.customers.length) await tx.customer.createMany({ data: b.customers });
       if (b.contacts.length) await tx.customerContact.createMany({ data: b.contacts });
       if (b.appointments.length) await tx.appointment.createMany({ data: b.appointments });
+
+      if (Array.isArray(b.conversations)) {
+        await wipeConversations(tx, tenantId);
+        if (b.conversations.length) await tx.conversation.createMany({ data: b.conversations });
+        if (b.messages.length)
+          await tx.message.createMany({
+            data: b.messages.map((m: any) => ({ ...m, toolCalls: json(m.toolCalls), usage: json(m.usage) })),
+          });
+        if (b.leads.length) await tx.lead.createMany({ data: b.leads });
+      }
     },
     { timeout: 180_000, maxWait: 20_000 },
   );
