@@ -251,7 +251,11 @@ POST   /appointments                            → حجز من التطبيق (
 POST   /appointments/:id/start | finish | no-show | cancel | confirm
 PATCH  /appointments/:id                        → { startAt?, staffId?, plannedMinutes?, notes? }
 GET    /appointments/slots?serviceId&staffId?&date&customerId?
-GET    /services · GET /staff · GET /staff/:id/photo   (صورة، مخبّأة)
+GET    /services · GET /staff · GET /staff/:id/photo   (صورة، مخبّأة) — `?all=1` يضمّ الموقوف
+POST   /services · PATCH /services/:id             → إدارة الخدمات من الجوال
+POST   /staff · PATCH /staff/:id                   → إدارة الفريق (serviceIds يستبدل القائمة)
+PUT    /staff/:id/photo (بايتات خام، ≤١٥٠ك) · DELETE /staff/:id/photo
+GET    /appointments/reports?from&to               → { report } — نفس أرقام لوحة التقارير
 GET    /customers?q=   · GET /customers/:id     → ملف كامل بالتاريخ والمدد المتعلَّمة
 POST   /customers  · PATCH /customers/:id       → { name?, phone?, notes?, preferredStaffId? }
 ```

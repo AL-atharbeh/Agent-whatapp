@@ -9,18 +9,18 @@
 export const MAX_BODY_BYTES = 64 * 1024;
 
 /**
- * النص، أو null إن تجاوز السقف.
+ * البايتات، أو null إن تجاوز السقف.
  *
  * content-length وحده لا يكفي: قد يغيب (ترميز مقطّع) أو يكذب. فنفحصه حين
  * يوجد لنرفض مبكراً بلا قراءة، ونعدّ البايتات أثناء القراءة على أي حال.
  */
-export async function readCappedText(req: Request, max = MAX_BODY_BYTES): Promise<string | null> {
+export async function readCappedBytes(req: Request, max = MAX_BODY_BYTES): Promise<Uint8Array | null> {
   const declared = req.headers.get("content-length");
   if (declared !== null) {
     const n = Number(declared);
     if (!Number.isFinite(n) || n < 0 || n > max) return null;
   }
-  if (!req.body) return "";
+  if (!req.body) return new Uint8Array(0);
 
   const reader = req.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -43,5 +43,11 @@ export async function readCappedText(req: Request, max = MAX_BODY_BYTES): Promis
     buf.set(c, off);
     off += c.byteLength;
   }
-  return new TextDecoder("utf-8").decode(buf);
+  return buf;
+}
+
+/** النص، أو null إن تجاوز السقف. */
+export async function readCappedText(req: Request, max = MAX_BODY_BYTES): Promise<string | null> {
+  const buf = await readCappedBytes(req, max);
+  return buf === null ? null : new TextDecoder("utf-8").decode(buf);
 }

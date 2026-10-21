@@ -20,6 +20,8 @@
 	<array>
 		<string>ar</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>لاختيار صورة لأعضاء الفريق تظهر في جدول المواعيد.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>يستخدم «حاضر» بصمة الوجه لقفل التطبيق كي لا يقرأ محادثات عملائك أحد غيرك.</string>
 	<key>UIBackgroundModes</key>

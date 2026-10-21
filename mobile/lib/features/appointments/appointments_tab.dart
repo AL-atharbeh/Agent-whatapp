@@ -14,6 +14,7 @@ import 'appointment_sheet.dart';
 import 'appointments_controller.dart';
 import 'appt_style.dart';
 import 'customers_screen.dart';
+import 'manage/manage_screen.dart';
 import 'date_strip.dart';
 import 'new_appointment_screen.dart';
 import 'timeline_view.dart';
@@ -87,6 +88,13 @@ class AppointmentsTab extends ConsumerWidget {
                       ],
                     ),
                   ),
+                  _GlassAction(
+                    key: const Key('appts.manage'),
+                    icon: Icons.tune_rounded,
+                    label: 'الإدارة',
+                    onTap: () => Navigator.of(context).push(ManageScreen.route()),
+                  ),
+                  const SizedBox(width: 10),
                   _GlassAction(
                     key: const Key('appts.customers'),
                     icon: Icons.people_alt_outlined,

@@ -167,6 +167,9 @@ class ServiceOffering {
         'rebookAfterDays': rebookAfterDays,
         'active': active,
       };
+
+  /// جسم POST/PATCH /services — بلا المعرّف (هو في المسار).
+  JsonMap toBody() => toJson()..remove('id');
 }
 
 class StaffMember {
@@ -179,6 +182,7 @@ class StaffMember {
     this.serviceIds,
     this.active = true,
     this.sortOrder = 0,
+    this.commissionPercent,
   });
 
   static const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -215,8 +219,30 @@ class StaffMember {
       serviceIds: services,
       active: readBool(m, 'active', fallback: true),
       sortOrder: readInt(m, 'sortOrder'),
+      commissionPercent: readDoubleOrNull(m, 'commissionPercent'),
     );
   }
+
+  /// دقائق ⇒ «HH:MM» كما يقبلها الخادم (و«24:00» لنهاية اليوم).
+  static String clock(int minutes) =>
+      '${(minutes ~/ 60).toString().padLeft(2, '0')}:${(minutes % 60).toString().padLeft(2, '0')}';
+
+  /// جسم POST/PATCH /staff. الأيام بلا فترات تُرسل فارغة صراحةً: يوم محذوف من
+  /// الخريطة يبقى بدوامه القديم عند الخادم، والمقصود «عطلة».
+  JsonMap toBody() => {
+        'name': name,
+        'phone': phone,
+        'workingHours': {
+          for (final d in dayKeys)
+            d: [
+              for (final r in workingHours[d] ?? const <DayRange>[]) [clock(r.start), clock(r.end)],
+            ],
+        },
+        'commissionPercent': commissionPercent,
+        'active': active,
+        'sortOrder': sortOrder,
+        'serviceIds': ?serviceIds,
+      };
 
   /// «10:00»–«14:00» ⇒ دقائق. فترة مقلوبة أو تالفة تُسقط وحدها.
   static DayRange? _range(Object? raw) {
@@ -248,6 +274,9 @@ class StaffMember {
   final List<String>? serviceIds;
   final bool active;
   final int sortOrder;
+
+  /// نسبة مقدّم الخدمة من دخل زياراته — للتقارير.
+  final double? commissionPercent;
 
   List<DayRange> hoursOn(DateTime day) => workingHours[dayKeys[day.weekday - 1]] ?? const [];
 
@@ -608,3 +637,65 @@ class NewAppointment {
 /// تاريخ اليوم بصيغة العقد (`YYYY-MM-DD`) — بتوقيت الجهاز (انظر تقرير العقد).
 String isoDay(DateTime d) =>
     '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+/// تقرير فترة (GET /appointments/reports) — نفس أرقام لوحة التقارير.
+class AppointmentReport {
+  const AppointmentReport({
+    required this.from,
+    required this.to,
+    this.visits = 0,
+    this.revenue = 0,
+    this.noShows = 0,
+    this.cancelled = 0,
+    this.noShowRate = 0,
+    this.minutesSaved = 0,
+    this.staff = const [],
+    this.topServices = const [],
+  });
+
+  factory AppointmentReport.fromJson(JsonMap raw) {
+    final m = raw.containsKey('report') ? asMap(raw['report']) : raw;
+    return AppointmentReport(
+      from: readString(m, 'from'),
+      to: readString(m, 'to'),
+      visits: readInt(m, 'visits'),
+      revenue: readDoubleOrNull(m, 'revenue') ?? 0,
+      noShows: readInt(m, 'noShows'),
+      cancelled: readInt(m, 'cancelled'),
+      noShowRate: readDoubleOrNull(m, 'noShowRate') ?? 0,
+      minutesSaved: readInt(m, 'minutesSaved'),
+      staff: [
+        for (final s in asList(m['staff']))
+          (
+            staffId: readString(asMap(s), 'staffId'),
+            name: readString(asMap(s), 'name'),
+            visits: readInt(asMap(s), 'visits'),
+            revenue: readDoubleOrNull(asMap(s), 'revenue') ?? 0,
+            commission: readDoubleOrNull(asMap(s), 'commission') ?? 0,
+          ),
+      ],
+      topServices: [
+        for (final s in asList(m['topServices']))
+          (
+            serviceId: readString(asMap(s), 'serviceId'),
+            name: readString(asMap(s), 'name'),
+            visits: readInt(asMap(s), 'visits'),
+            revenue: readDoubleOrNull(asMap(s), 'revenue') ?? 0,
+          ),
+      ],
+    );
+  }
+
+  final String from;
+  final String to;
+  final int visits;
+  final double revenue;
+  final int noShows;
+  final int cancelled;
+
+  /// من ٠ إلى ١.
+  final double noShowRate;
+  final int minutesSaved;
+  final List<({String staffId, String name, int visits, double revenue, double commission})> staff;
+  final List<({String serviceId, String name, int visits, double revenue})> topServices;
+}

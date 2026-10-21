@@ -682,7 +682,7 @@ class FakeHaderApi implements HaderApi {
   @override
   Future<Uint8List?> staffPhoto(String staffId) async {
     await _appointmentsGate();
-    return null;
+    return _photos[staffId];
   }
 
   @override
@@ -713,6 +713,107 @@ class FakeHaderApi implements HaderApi {
   }) async {
     await _appointmentsGate();
     return bookings.updateCustomer(id, name: name, phone: phone, notes: notes, preferredStaffId: preferredStaffId);
+  }
+
+  // ───────────── الإدارة ─────────────
+
+  final Map<String, Uint8List> _photos = {};
+  int _mgmtSeq = 1;
+
+  @override
+  Future<List<ServiceOffering>> allServices() async {
+    await _appointmentsGate();
+    return bookings.services.values.toList();
+  }
+
+  @override
+  Future<ServiceOffering> saveService(ServiceOffering service, {String? id}) async {
+    await _appointmentsGate();
+    if (id != null && !bookings.services.containsKey(id)) {
+      throw ApiError(ApiErrorCode.notFound, ApiError.defaultMessage(ApiErrorCode.notFound), status: 404);
+    }
+    final max = service.priceMax;
+    if (max != null && max < service.priceMin) {
+      throw const ApiError(ApiErrorCode.invalidInput, 'السعر الأعلى أقل من الأدنى', status: 400);
+    }
+    final saved = ServiceOffering.fromJson({...service.toBody(), 'id': id ?? 'svc_new_${_mgmtSeq++}'})!;
+    bookings.services[saved.id] = saved;
+    return saved;
+  }
+
+  @override
+  Future<List<StaffMember>> allStaff() async {
+    await _appointmentsGate();
+    return [for (final s in bookings.staff) _withPhoto(s)];
+  }
+
+  @override
+  Future<StaffMember> saveStaff(StaffMember member, {String? id}) async {
+    await _appointmentsGate();
+    final i = id == null ? -1 : bookings.staff.indexWhere((s) => s.id == id);
+    if (id != null && i < 0) {
+      throw ApiError(ApiErrorCode.notFound, ApiError.defaultMessage(ApiErrorCode.notFound), status: 404);
+    }
+    final saved = StaffMember.fromJson({...member.toBody(), 'id': id ?? 'st_new_${_mgmtSeq++}', 'hasPhoto': false})!;
+    if (i < 0) {
+      bookings.staff.add(saved);
+    } else {
+      bookings.staff[i] = saved;
+    }
+    return _withPhoto(saved);
+  }
+
+  @override
+  Future<StaffMember> uploadStaffPhoto(String staffId, Uint8List bytes, {String mime = 'image/jpeg'}) async {
+    await _appointmentsGate();
+    if (bytes.length > 150 * 1024) {
+      throw const ApiError(ApiErrorCode.invalidInput, 'الصورة أكبر من ١٥٠ كيلوبايت', status: 400);
+    }
+    _photos[staffId] = bytes;
+    return _withPhoto(bookings.staff.firstWhere((s) => s.id == staffId));
+  }
+
+  @override
+  Future<StaffMember> deleteStaffPhoto(String staffId) async {
+    await _appointmentsGate();
+    _photos.remove(staffId);
+    return _withPhoto(bookings.staff.firstWhere((s) => s.id == staffId));
+  }
+
+  StaffMember _withPhoto(StaffMember s) =>
+      StaffMember.fromJson({...s.toBody(), 'id': s.id, 'hasPhoto': _photos.containsKey(s.id)})!;
+
+  @override
+  Future<AppointmentReport> appointmentReport({required String from, required String to}) async {
+    await _appointmentsGate();
+    bool inRange(Appointment a) {
+      final d = a.startAt.toIso8601String().substring(0, 10);
+      return d.compareTo(from) >= 0 && d.compareTo(to) <= 0;
+    }
+
+    final rows = bookings.appointments.values.where(inRange).toList();
+    final done = rows.where((a) => a.status == AppointmentStatus.done).toList();
+    final noShows = rows.where((a) => a.status == AppointmentStatus.noShow).length;
+    double sum(Iterable<Appointment> xs) => xs.fold(0, (t, a) => t + (a.finalPrice ?? 0));
+    return AppointmentReport(
+      from: from,
+      to: to,
+      visits: done.length,
+      revenue: sum(done),
+      noShows: noShows,
+      cancelled: rows.where((a) => a.status == AppointmentStatus.cancelled).length,
+      noShowRate: done.length + noShows == 0 ? 0 : noShows / (done.length + noShows),
+      staff: [
+        for (final st in bookings.staff)
+          (
+            staffId: st.id,
+            name: st.name,
+            visits: done.where((a) => a.staffId == st.id).length,
+            revenue: sum(done.where((a) => a.staffId == st.id)),
+            commission: sum(done.where((a) => a.staffId == st.id)) * (st.commissionPercent ?? 0) / 100,
+          ),
+      ],
+    );
   }
 
   // ───────────── محاكاة الحياة ─────────────

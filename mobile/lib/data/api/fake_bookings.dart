@@ -372,7 +372,7 @@ class FakeBookings {
     } else if (r.newCustomerPhone != null) {
       cu = createCustomer(phone: r.newCustomerPhone!, name: r.newCustomerName);
     } else {
-      throw const ApiError(ApiErrorCode.invalidInput, 'اختر زبونة أو أدخل رقمها.', status: 400);
+      throw const ApiError(ApiErrorCode.invalidInput, 'اختر عميلاً أو أدخل رقمه.', status: 400);
     }
     final minutes = r.plannedMinutes ?? _estimateFor(cu.id, st.id, svc.id).minutes;
     final now = _now();

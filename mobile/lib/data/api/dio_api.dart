@@ -353,6 +353,54 @@ class DioHaderApi implements HaderApi {
         'preferredStaffId': ?preferredStaffId,
       }));
 
+  @override
+  Future<List<ServiceOffering>> allServices() async =>
+      readList(await _send('GET', '/services', query: {'all': '1'}), 'items', ServiceOffering.fromJson);
+
+  @override
+  Future<ServiceOffering> saveService(ServiceOffering service, {String? id}) async {
+    final j = id == null
+        ? await _send('POST', '/services', body: service.toBody())
+        : await _send('PATCH', '/services/${_seg(id)}', body: service.toBody());
+    final s = ServiceOffering.fromJson(asMap(j['service']));
+    if (s == null) throw const ApiError(ApiErrorCode.unknown, 'رد غير مكتمل من الخادم.');
+    return s;
+  }
+
+  @override
+  Future<List<StaffMember>> allStaff() async =>
+      readList(await _send('GET', '/staff', query: {'all': '1'}), 'items', StaffMember.fromJson);
+
+  @override
+  Future<StaffMember> saveStaff(StaffMember member, {String? id}) async => _requireStaff(id == null
+      ? await _send('POST', '/staff', body: member.toBody())
+      : await _send('PATCH', '/staff/${_seg(id)}', body: member.toBody()));
+
+  @override
+  Future<StaffMember> uploadStaffPhoto(String staffId, Uint8List bytes, {String mime = 'image/jpeg'}) async =>
+      _requireStaff(await _send(
+        'PUT',
+        '/staff/${_seg(staffId)}/photo',
+        // البايتات كما هي (لا تدفّق: PUT يُعاد عند انقطاع، والتدفّق لا يُقرأ مرتين).
+        // الخادم يفحص النوع الحقيقي من المحتوى لا من الرأس.
+        body: bytes,
+        options: Options(contentType: mime),
+      ));
+
+  @override
+  Future<StaffMember> deleteStaffPhoto(String staffId) async =>
+      _requireStaff(await _send('DELETE', '/staff/${_seg(staffId)}/photo'));
+
+  @override
+  Future<AppointmentReport> appointmentReport({required String from, required String to}) async =>
+      AppointmentReport.fromJson(await _send('GET', '/appointments/reports', query: {'from': from, 'to': to}));
+
+  static StaffMember _requireStaff(JsonMap j) {
+    final s = StaffMember.fromJson(asMap(j['staff']));
+    if (s == null) throw const ApiError(ApiErrorCode.unknown, 'رد غير مكتمل من الخادم.');
+    return s;
+  }
+
   static Appointment _requireAppointment(JsonMap j) {
     final a = Appointment.fromJson(j);
     if (a == null) throw const ApiError(ApiErrorCode.unknown, 'رد غير مكتمل من الخادم.');

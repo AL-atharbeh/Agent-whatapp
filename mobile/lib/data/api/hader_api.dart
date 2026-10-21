@@ -118,4 +118,25 @@ abstract interface class HaderApi {
     String? notes,
     String? preferredStaffId,
   });
+
+  // ───────────── الإدارة: الخدمات والفريق والتقارير ─────────────
+
+  /// كل الخدمات، والموقوفة معها — لشاشة الإدارة وحدها.
+  Future<List<ServiceOffering>> allServices();
+
+  /// [id] null ⇒ إنشاء، وإلا تعديل.
+  Future<ServiceOffering> saveService(ServiceOffering service, {String? id});
+
+  /// كل الفريق، والموقوفون معه.
+  Future<List<StaffMember>> allStaff();
+
+  Future<StaffMember> saveStaff(StaffMember member, {String? id});
+
+  /// [bytes] صورة JPEG/PNG/WebP حتى ١٥٠ كيلوبايت.
+  Future<StaffMember> uploadStaffPhoto(String staffId, Uint8List bytes, {String mime = 'image/jpeg'});
+
+  Future<StaffMember> deleteStaffPhoto(String staffId);
+
+  /// [from] و[to] بصيغة `YYYY-MM-DD` شاملتين.
+  Future<AppointmentReport> appointmentReport({required String from, required String to});
 }
