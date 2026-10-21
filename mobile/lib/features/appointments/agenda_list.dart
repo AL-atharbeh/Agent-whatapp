@@ -175,7 +175,7 @@ class _AgendaCard extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 14, 4, 14),
                     child: SizedBox(
-                      width: 58,
+                      width: 66,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -183,9 +183,10 @@ class _AgendaCard extends ConsumerWidget {
                             clockTime(a.startAt),
                             style: TextStyle(fontFamily: kFont, fontSize: 17, fontWeight: FontWeight.w800, color: hc.text),
                           ),
+                          // وقت ثانٍ بلا كلمة بدا كأنه موعد آخر؛ «حتى» تقول إنه النهاية
                           Text(
-                            clockTime(a.plannedEnd),
-                            style: TextStyle(fontFamily: kFont, fontSize: 12, color: hc.text3),
+                            'حتى ${clockTime(a.plannedEnd)}',
+                            style: TextStyle(fontFamily: kFont, fontSize: 11.5, color: hc.text3),
                           ),
                         ],
                       ),
