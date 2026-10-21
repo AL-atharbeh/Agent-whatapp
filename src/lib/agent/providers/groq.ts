@@ -132,6 +132,9 @@ export const groqProvider: Provider = {
           tools,
           max_tokens: 2048,
           temperature: 0.3,
+          // تفكير gpt-oss يُحتسب من حصّة الدقيقة كأي ناتج، وردّ خدمة عملاء
+          // لا يحتاج تفكيراً متوسطاً — «low» يوفّر مئات التوكنات في كل نداء
+          ...(model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" as const } : {}),
         }),
       );
 
