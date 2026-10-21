@@ -187,7 +187,12 @@ export function buildAppointmentTools(args: {
   const book = defineTool({
     name: "book_appointment",
     description: "يحجز. فقط بعد «نعم» صريحة من العميل على الخدمة والوقت ومقدّم الخدمة.",
-    schema: z.object({ service_id: ID, staff_id: ID, start: LOCAL }),
+    schema: z.object({
+      service_id: ID,
+      staff_id: ID,
+      start: LOCAL,
+      for_name: z.string().max(60).optional().describe("اسم الشخص إن كان الحجز لغير صاحب المحادثة"),
+    }),
     run: async (input) => {
       try {
         const startAt = parseLocal(input.start, tz);
@@ -199,6 +204,8 @@ export function buildAppointmentTools(args: {
           staffId: input.staff_id,
           startAt,
           source,
+          // يظهر في بطاقة الموعد فيعرف الفريق من القادم فعلاً
+          notes: input.for_name?.trim() ? `الحجز لـ ${input.for_name.trim()}` : null,
         });
         log("book_appointment", input, "تم الحجز");
         return out({ ok: true, appointment: brief(a), note: "أعد تأكيد التفاصيل للعميل." });
