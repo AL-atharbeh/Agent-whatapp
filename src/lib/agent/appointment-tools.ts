@@ -97,6 +97,7 @@ export function buildAppointmentTools(args: {
     service: a.service.name,
     with: a.staff.name,
     start: `${a.local.date} ${a.local.time}`,
+    minutes: a.plannedMinutes,
     status: a.status,
   });
 

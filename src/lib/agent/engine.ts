@@ -1,5 +1,6 @@
 import type { Channel, MessageRole } from "@prisma/client";
 import type { TenantContext, TenantScope } from "../tenancy";
+import { addDays, toLocal } from "../appointments/time";
 import { buildSystemPrompt } from "./prompt";
 import { VOICE_STYLE } from "./voice-style";
 import { buildTools, type RunState } from "./tools";
@@ -65,6 +66,24 @@ export type HistoryItem = { role: MessageRole; text: string };
  */
 const MAX_HISTORY_CHARS = 2400;
 
+/**
+ * «اليوم/بكرا/بعد بكرا» بتواريخها صراحةً.
+ *
+ * من «الوقت الآن» وحده يحسب النموذج الأيام بنفسه ويخطئ: قال «بكرا الجمعة»
+ * والجمعة بعد بكرا، ثم «بكرا الخميس» في الرد نفسه. سطران بعد نقطة الكاش
+ * أرخص من حجز يصل العميل بيوم خاطئ.
+ */
+function dayNames(tz: string): string {
+  const today = toLocal(new Date(), tz).date;
+  const label = (d: string) =>
+    `${new Date(`${d}T12:00:00Z`).toLocaleDateString("ar", { weekday: "long", timeZone: "UTC" })} ${d}`;
+  return [
+    `اليوم: ${label(today)}`,
+    `بكرا: ${label(addDays(today, 1))}`,
+    `بعد بكرا: ${label(addDays(today, 2))}`,
+  ].join(" · ");
+}
+
 export async function runAgentTurn(args: {
   tenant: TenantContext;
   scope: TenantScope;
@@ -117,7 +136,7 @@ export async function runAgentTurn(args: {
       channel === "VOICE"
         ? buildSystemPrompt(tenant) + VOICE_STYLE
         : buildSystemPrompt(tenant),
-    volatileContext: `الوقت الآن: ${now}`,
+    volatileContext: `الوقت الآن: ${now}\n${dayNames(tenant.timezone)}`,
     history: cleanHistory,
     userMessage,
     tools,
