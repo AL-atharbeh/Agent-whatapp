@@ -14,10 +14,12 @@ import {
   getAppointment,
   listServices,
   listStaff,
+  addDays,
   minutesOf,
   parseLocal,
   rescheduleAppointment,
   sourceOfChannel,
+  toLocal,
   upcomingFor,
   upsertCustomerFromContact,
 } from "../appointments";
@@ -63,6 +65,21 @@ function failure(err: unknown) {
   return out({ ok: false, reason: "تعذّر الآن. اعرض التحويل لموظف." });
 }
 
+/**
+ * «اليوم/أمس/بكرا…» للتاريخ محسوباً هنا لا في النموذج.
+ *
+ * من تاريخ خام يحسب النموذج اليوم بنفسه ويخطئ، خاصة حين يحمل تاريخ
+ * المحادثة «بكرا» من رسالة الأمس: قال عن صبغة انتهت قبل ساعة إنها
+ * «بكرا ولسّا ما صارت».
+ */
+function dayWord(date: string, today: string): string {
+  if (date === today) return "اليوم";
+  if (date === addDays(today, -1)) return "أمس";
+  if (date === addDays(today, 1)) return "بكرا";
+  if (date === addDays(today, 2)) return "بعد بكرا";
+  return date < today ? "سابقاً" : "لاحقاً";
+}
+
 /** دقائق اليوم من «YYYY-MM-DD HH:MM» */
 const minutesOfLocal = (local: string) => minutesOf(local.slice(11));
 
@@ -92,8 +109,11 @@ export function buildAppointmentTools(args: {
     return a;
   };
 
+  const today = () => toLocal(new Date(), tz).date;
+
   const brief = (a: Awaited<ReturnType<typeof getAppointment>>) => ({
     id: a.id,
+    day: dayWord(a.local.date, today()),
     service: a.service.name,
     with: a.staff.name,
     start: `${a.local.date} ${a.local.time}`,
@@ -307,6 +327,7 @@ export function buildAppointmentTools(args: {
             service: r.service.name,
             // بالساعة لا باليوم وحده: «موعد ٣:١٥» في رسالة سابقة يجب أن يُطابَق بزيارته
             start: formatLocal(r.startAt, tz),
+            day: dayWord(toLocal(r.startAt, tz).date, today()),
             with: r.staff.name,
             notes: r.notes,
           })),
