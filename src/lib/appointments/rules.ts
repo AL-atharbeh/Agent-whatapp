@@ -314,13 +314,20 @@ export function delayDecision(appts: DayAppt[], now: Date, thresholdMinutes: num
   );
   if (!next || next.delayNotifiedAt) return { notify: false };
 
+  // التالي يبدأ داخل وقت انتظار المرساة إن اتّسع له — ولو تزحزح الانتظار
+  // دقائق. كان الشرط «يقع كاملاً في الانتظار كما هو»: صبغة تأخّرت دقيقة
+  // واحدة أزاحت انتظارها دقيقة، فخرج السشوار منه وحُسب كأنه ينتظر نهاية
+  // الصبغة كلها — رسالة «تأخير ٩٠ دقيقة» عن تأخير دقيقة.
   const gap = processingGap(anchor.span, anchor.processing);
-  const nextEnd = new Date(next.startAt.getTime() + next.plannedMinutes * MIN);
-  if (gap && gap.start <= next.startAt && nextEnd <= gap.end) return { notify: false };
+  let expectedStart = anchor.span.end;
+  if (gap) {
+    const inGap = new Date(Math.max(next.startAt.getTime(), gap.start.getTime()));
+    if (inGap.getTime() + next.plannedMinutes * MIN <= gap.end.getTime()) expectedStart = inGap;
+  }
 
-  const delay = Math.round((anchor.span.end.getTime() - next.startAt.getTime()) / MIN);
+  const delay = Math.round((expectedStart.getTime() - next.startAt.getTime()) / MIN);
   if (delay < thresholdMinutes) return { notify: false };
-  return { notify: true, appointmentId: next.id, delayMinutes: delay, expectedStart: anchor.span.end };
+  return { notify: true, appointmentId: next.id, delayMinutes: delay, expectedStart };
 }
 
 // ═══════════════════════════════════════════════════════════

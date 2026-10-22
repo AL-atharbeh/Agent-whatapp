@@ -395,6 +395,31 @@ test("delayDecision: التالي يقع كاملاً في وقت انتظار �
   );
   assert.equal(r.notify, false);
 });
+test("delayDecision: مرساة تأخّرت دقيقة ⇒ التالي داخل الانتظار المُزاح، لا تنبيه", () => {
+  // صبغة ١٤:٠٠ (١٢٠ د، انتظار بعد ٣٠ لمدة ٣٥) لم تبدأ والساعة ١٤:٠١، وسشوار ١٤:٣٠ لـ ٣٠ د
+  const r = delayDecision(
+    [
+      day({ id: "a", startAt: T, plannedMinutes: 120, processing: { afterMinutes: 30, minutes: 35 } }),
+      day({ id: "b", startAt: plus(T, 30), plannedMinutes: 30 }),
+    ],
+    plus(T, 1),
+    10,
+  );
+  assert.equal(r.notify, false, "تأخير دقيقة واحدة لا ٩٠");
+});
+test("delayDecision: الانتظار المُزاح لا يتّسع للتالي ⇒ تأخير حتى نهاية المرساة", () => {
+  const r = delayDecision(
+    [
+      day({ id: "a", startAt: T, plannedMinutes: 120, processing: { afterMinutes: 30, minutes: 35 } }),
+      day({ id: "b", startAt: plus(T, 30), plannedMinutes: 30 }),
+    ],
+    plus(T, 20),
+    10,
+  );
+  // المرساة تبدأ ١٤:٢٠ ⇒ انتظارها ١٤:٥٠–١٥:٢٥ يتّسع للسشوار من ١٤:٥٠ ⇒ تأخير ٢٠ د لا ١١٠
+  assert.equal(r.notify, true);
+  if (r.notify) assert.equal(r.delayMinutes, 20);
+});
 test("delayDecision: لا جلسة ولا متأخّر ⇒ لا شيء", () => {
   assert.equal(delayDecision([day({ id: "b", startAt: plus(T, 60) })], T, 10).notify, false);
 });
