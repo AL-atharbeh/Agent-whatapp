@@ -18,6 +18,8 @@ export {
   formatLocal,
   minutesOf,
   parseLocal,
+  spokenDate,
+  spokenTime,
   toLocal,
   zonedToUtc,
   type Weekday,

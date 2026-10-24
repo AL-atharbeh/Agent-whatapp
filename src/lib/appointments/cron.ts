@@ -1,5 +1,5 @@
 import { prisma } from "../db";
-import { addDays, dayBounds, toLocal } from "./time";
+import { addDays, dayBounds, spokenDate, spokenTime, toLocal } from "./time";
 import { isAutoNoShow, rebookDue, reminderDue, templateVars, REBOOK_GRACE_DAYS } from "./rules";
 import { loadApptTenant, type ApptTenant } from "./tenant";
 import { TenantMessenger } from "./messaging";
@@ -144,7 +144,7 @@ export async function runForTenant(t: ApptTenant, now: Date): Promise<TenantCron
       const first = claimed[0];
       const l = toLocal(first.startAt, t.timezone);
       const line = (a: (typeof rows)[number]) =>
-        `${toLocal(a.startAt, t.timezone).time} — ${a.service.name} مع ${a.staff.name}` +
+        `الساعة ${spokenTime(toLocal(a.startAt, t.timezone).time)} — ${a.service.name} مع ${a.staff.name}` +
         (a.notes?.startsWith("الحجز لـ") ? ` (${a.notes})` : "");
       const name = first.customer.name;
       const text =
@@ -252,7 +252,7 @@ export async function runForTenant(t: ApptTenant, now: Date): Promise<TenantCron
         customerId: a.customerId,
         text:
           `${a.customer.name ? `أهلاً ${a.customer.name}، ` : ""}صار وقت ${a.service.name} من جديد 🙂 ` +
-          `آخر مرة كانت بتاريخ ${l.date} مع ${a.staff.name}. ` +
+          `آخر مرة كانت ${spokenDate(l.date)} مع ${a.staff.name}. ` +
           `بتحب نحجزلك موعد؟ قلّنا اليوم والوقت اللي بناسبك.`,
         template: {
           name: s.rebookTemplate,

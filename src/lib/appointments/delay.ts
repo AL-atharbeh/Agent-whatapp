@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { prisma } from "../db";
 import { beginAppointment, staffAppointments, toBusy, type AppointmentView } from "./booking";
 import { delayDecision, templateVars, type DayAppt } from "./rules";
-import { dayBounds, toLocal } from "./time";
+import { dayBounds, spokenTime, toLocal } from "./time";
 import { loadApptTenant, type ApptTenant } from "./tenant";
 import { TenantMessenger } from "./messaging";
 
@@ -52,8 +52,8 @@ export async function checkStaffDelay(
     // نص محايد لا يفترض نوع النشاط: يصلح لعيادة ومركز صيانة وصالون
     text:
       `${appt.customer.name ? `أهلاً ${appt.customer.name}، ` : ""}نعتذر منك، عندنا تأخير حوالي ` +
-      `${d.delayMinutes} دقيقة على موعدك (${appt.service.name} الساعة ${local.time}). ` +
-      `الوقت المتوقّع ${expected}. شكراً لصبرك 🙏`,
+      `${minutesPhrase(d.delayMinutes)} على موعدك (${appt.service.name} الساعة ${spokenTime(local.time)}). ` +
+      `الوقت المتوقّع ${spokenTime(expected)}. شكراً لصبرك 🙏`,
     template: {
       name: t.settings.delayTemplate,
       vars: (n) =>
@@ -101,3 +101,8 @@ export async function startAppointment(tenantId: string, id: string): Promise<Ap
   return a;
 }
 
+/** «١٠ دقائق»، «٩٠ دقيقة» — العدد بأرقام المحادثة وتمييزه كما يُقال. */
+function minutesPhrase(n: number): string {
+  const digits = String(n).replace(/\d/g, (x) => "٠١٢٣٤٥٦٧٨٩"[Number(x)]);
+  return `${digits} ${n >= 3 && n <= 10 ? "دقائق" : "دقيقة"}`;
+}

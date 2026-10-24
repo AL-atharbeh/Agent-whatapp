@@ -147,3 +147,38 @@ export function parseLocal(v: string, tz: string): Date | null {
   if (!m || !isDateStr(m[1]) || !isTimeStr(m[2]) || m[2] === "24:00") return null;
   return zonedToUtc(m[1], m[2], tz);
 }
+
+// ═══════════════════════════════════════════════════════════
+//  للعميل: وقت وتاريخ كما يُقالان لا كما يُخزَّنان
+// ═══════════════════════════════════════════════════════════
+
+const AR_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+const arDigits = (s: string) => s.replace(/\d/g, (d) => AR_DIGITS[Number(d)]);
+const AR_MONTHS = [
+  "كانون الثاني", "شباط", "آذار", "نيسان", "أيار", "حزيران",
+  "تموز", "آب", "أيلول", "تشرين الأول", "تشرين الثاني", "كانون الأول",
+];
+const AR_WEEKDAYS: Record<Weekday, string> = {
+  sun: "الأحد", mon: "الاثنين", tue: "الثلاثاء", wed: "الأربعاء", thu: "الخميس", fri: "الجمعة", sat: "السبت",
+};
+
+/**
+ * «14:00» ⇒ «٢ العصر»، «09:30» ⇒ «٩:٣٠ الصبح».
+ *
+ * رسائل النظام كانت تقول «14:00» و«2026-10-22» بينما الوكيل في المحادثة
+ * نفسها يقول «الساعة ٢ العصر» — رسالتان من «حاضر» بلغتين.
+ */
+export function spokenTime(hhmm: string): string {
+  const m = minutesOf(hhmm);
+  const h = Math.floor(m / 60) % 24;
+  const min = m % 60;
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  const part = h < 12 ? "الصبح" : h < 14 ? "الظهر" : h < 17 ? "العصر" : "المسا";
+  return `${arDigits(min ? `${h12}:${String(min).padStart(2, "0")}` : String(h12))} ${part}`;
+}
+
+/** «2026-10-22» ⇒ «الخميس ٢٢ تشرين الأول». */
+export function spokenDate(dateStr: string): string {
+  const [, mo, d] = dateStr.split("-").map(Number);
+  return `${AR_WEEKDAYS[weekdayOf(dateStr)]} ${arDigits(String(d))} ${AR_MONTHS[mo - 1]}`;
+}

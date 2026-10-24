@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { spokenDate, spokenTime } from "../src/lib/appointments/time";
 import {
   addDays,
   dayBounds,
@@ -419,6 +420,13 @@ test("delayDecision: الانتظار المُزاح لا يتّسع للتال�
   // المرساة تبدأ ١٤:٢٠ ⇒ انتظارها ١٤:٥٠–١٥:٢٥ يتّسع للسشوار من ١٤:٥٠ ⇒ تأخير ٢٠ د لا ١١٠
   assert.equal(r.notify, true);
   if (r.notify) assert.equal(r.delayMinutes, 20);
+});
+test("spokenTime/spokenDate: كما يُقالان للعميل", () => {
+  assert.equal(spokenTime("14:00"), "٢ العصر");
+  assert.equal(spokenTime("09:30"), "٩:٣٠ الصبح");
+  assert.equal(spokenTime("12:15"), "١٢:١٥ الظهر");
+  assert.equal(spokenTime("18:00"), "٦ المسا");
+  assert.equal(spokenDate("2026-10-22"), "الخميس ٢٢ تشرين الأول");
 });
 test("delayDecision: لا جلسة ولا متأخّر ⇒ لا شيء", () => {
   assert.equal(delayDecision([day({ id: "b", startAt: plus(T, 60) })], T, 10).notify, false);
