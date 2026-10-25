@@ -62,7 +62,9 @@ export async function POST(
   // النقطة عامة بالضرورة (منصة خارجية تناديها)، فبدون سرّ يستطيع أي أحد
   // تشغيل وكيل العميل وصرف رصيده. السرّ لكل متجر لا للمنصة كلها.
   const auth = req.headers.get("authorization") ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  // Vapi يحفظ مفتاح «Custom LLM» من لوحته بلا بادئة Bearer أحياناً، فنقبل
+  // الشكلين — السرّ نفسه هو ما يُطابَق لا البادئة
+  const token = (auth.startsWith("Bearer ") ? auth.slice(7) : auth).trim();
   if (!token) return err(401, "ينقص ترويسة Authorization");
 
   const row = await prisma.tenant.findUnique({
