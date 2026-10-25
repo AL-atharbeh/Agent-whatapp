@@ -76,8 +76,10 @@ export async function upsertCustomerFromContact(
     return found.customer;
   }
 
+  // المكالمة (واتساب أو هاتف) تأتي برقم المتصل: نفس الرقم ⇒ نفس العميل
+  // الذي حجز بالرسائل، لا ملف ثانٍ له
   const phone =
-    contact.channel === "WHATSAPP" && isPlausiblePhone(contact.externalUserId)
+    (contact.channel === "WHATSAPP" || contact.channel === "VOICE") && isPlausiblePhone(contact.externalUserId)
       ? contact.externalUserId
       : null;
 

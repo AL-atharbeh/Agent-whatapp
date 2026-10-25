@@ -441,6 +441,7 @@ const PAST_GRACE_MS = 15 * MIN;
 const AGENT_SOURCES: AppointmentSource[] = ["WHATSAPP", "INSTAGRAM", "MESSENGER"];
 
 export function sourceOfChannel(channel: Channel): AppointmentSource | null {
+  if (channel === "VOICE") return "PHONE";
   return channel === "WHATSAPP" || channel === "INSTAGRAM" || channel === "MESSENGER" ? channel : null;
 }
 

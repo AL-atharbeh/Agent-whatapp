@@ -81,7 +81,13 @@ export async function POST(
     return err(403, "المكالمات خارج باقة هذا المتجر");
   }
 
-  let body: { messages?: ChatMessage[]; stream?: boolean; user?: string };
+  let body: {
+    messages?: ChatMessage[];
+    stream?: boolean;
+    user?: string;
+    // Vapi يرسل المكالمة نفسها مع كل طلب: رقم المتصل ومعرّف المكالمة
+    call?: { id?: string; customer?: { number?: string } };
+  };
   try {
     body = await req.json();
   } catch {
@@ -118,8 +124,16 @@ export async function POST(
     return err(429, "تجاوز السقف اليومي للردود");
   }
 
-  // معرّف المتصل من المنصة — يربط الأدوات (تسجيل عميل محتمل مثلاً) بمتصل بعينه
-  const caller = typeof body.user === "string" && body.user ? body.user : "voice-caller";
+  // المتصل: رقمه إن وصل (مكالمة واتساب أو هاتف) فيصير هو نفس عميل الرسائل
+  // ويحجز باسمه. بلا رقم: معرّف المكالمة — معرّف ثابت مشترك كان سيجمع كل
+  // المتصلين المجهولين في ملف عميل واحد تتراكم عليه حجوزات غرباء.
+  const number = (body.call?.customer?.number ?? "").replace(/\D/g, "");
+  const caller =
+    number.length >= 8
+      ? number
+      : typeof body.user === "string" && body.user
+        ? body.user
+        : `call-${body.call?.id ?? crypto.randomUUID()}`;
 
   let reply: string;
   try {
