@@ -141,6 +141,7 @@ export async function runAgentTurn(args: {
     userMessage,
     tools,
     maxIterations: 6,
+    fast: channel === "VOICE",
   });
 
   // رفض من النموذج ⇒ لا نرسل نصاً غامضاً للعميل، نحوّل لموظف.

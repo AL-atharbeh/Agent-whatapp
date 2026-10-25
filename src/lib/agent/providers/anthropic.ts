@@ -53,7 +53,11 @@ export const anthropicProvider: Provider = {
       messages,
       tools,
       max_iterations: req.maxIterations,
-      thinking: { type: "adaptive" as const },
+      // Haiku يقبل إطفاء التفكير؛ Opus 5.5 يرفضه (400) فيبقى تكيّفياً هناك
+      thinking:
+        req.fast && req.model.startsWith("claude-haiku")
+          ? ({ type: "disabled" } as const)
+          : ({ type: "adaptive" } as const),
       output_config: {
         effort: req.effort as "low" | "medium" | "high" | "xhigh" | "max",
       },

@@ -13,6 +13,11 @@ export type ProviderRequest = {
   tools: AgentTool[];
   /** حد أقصى لجولات الأدوات، حماية من الحلقات اللانهائية */
   maxIterations: number;
+  /**
+   * المكالمة: كل ثانية صمت يسمعها المتصل. التفكير قبل الرد يضيف ثوانيَ
+   * لسؤال سعر بسيط، فيُطفأ حيث يقبله النموذج.
+   */
+  fast?: boolean;
 };
 
 export type ProviderUsage = {
