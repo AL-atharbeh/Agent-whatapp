@@ -1,3 +1,4 @@
+import { resolve4 } from "node:dns/promises";
 import { prisma } from "../src/lib/db";
 import { decrypt } from "../src/lib/crypto";
 
@@ -12,18 +13,16 @@ import { decrypt } from "../src/lib/crypto";
  * تُنشأ مكالمة. رقم «BYO» على جذع SIP يقبل الرقم كما ترسله Meta، ومضيفه خاص
  * به (<credential>.sip.vapi.ai).
  *
- * وVapi يقبل الوارد على الجذع من عناوين بواباته فقط: فتُسجَّل نطاقات Meta
- * (AS32934) كلها بوابات واردة. القائمة من وثيقة Meta للمكالمات وتتغيّر نادراً:
- *   whois -h whois.radb.net -- '-i origin AS32934' | grep ^route | awk '{print $2}' | grep -v ':' | cidrmerge
+ * بوابات الجذع: عناوين مضيف SIP عند Meta (meta.vc) بأقنعة /24. نطاقات Meta
+ * كلها (AS32934، ٢٣ نطاقاً من /14 إلى /23) أوسع من أن تُسجَّل: Vapi يرفض قناعاً
+ * أقل من /24، وتفكيكها يعطي أكثر من ألفي بوابة.
  */
 
-const META_PREFIXES = [
-  "31.13.24.0/21", "31.13.64.0/18", "45.64.40.0/22", "57.141.0.0/21", "57.141.8.0/22",
-  "57.141.12.0/23", "57.144.0.0/14", "66.220.144.0/20", "69.63.176.0/20", "69.171.224.0/19",
-  "74.119.76.0/22", "102.132.96.0/20", "103.4.96.0/22", "129.134.0.0/16", "147.75.208.0/20",
-  "157.240.0.0/16", "163.70.128.0/17", "163.77.128.0/17", "173.252.64.0/18", "179.60.192.0/22",
-  "185.60.216.0/22", "185.89.216.0/22", "204.15.20.0/22",
-];
+/** عناوين مضيف SIP عند Meta، كل واحد بشبكته /24. */
+async function metaGateways(): Promise<string[]> {
+  const ips = await resolve4("meta.vc");
+  return [...new Set(ips.map((ip) => ip.split(".").slice(0, 3).join(".") + ".0"))];
+}
 
 const VAPI = "https://api.vapi.ai";
 const GRAPH = "https://graph.facebook.com/v23.0";
@@ -69,10 +68,7 @@ async function main() {
   const credential = await vapi("POST", "/credential", {
     provider: "byo-sip-trunk",
     name: `whatsapp-${slug}`,
-    gateways: META_PREFIXES.map((p) => {
-      const [ip, mask] = p.split("/");
-      return { ip, netmask: Number(mask), inboundEnabled: true, outboundEnabled: false };
-    }),
+    gateways: (await metaGateways()).map((ip) => ({ ip, netmask: 24, inboundEnabled: true, outboundEnabled: false })),
   });
   const host = `${credential.id}.sip.vapi.ai`;
   console.log(`🔐 الجذع: ${credential.id}`);
