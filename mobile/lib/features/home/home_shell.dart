@@ -42,6 +42,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   final List<StreamSubscription<Object?>> _subs = [];
   bool _wasOffline = false;
 
+  /// سُجّل رمز الإشعارات عند الخادم. رمز APNs قد يتأخر عن أول تشغيل (أو بعد
+  /// منح الإذن)، ولا حدث يُعلن وصوله — فنعيد المحاولة عند كل عودة للمقدّمة
+  /// حتى ينجح، بدل جهاز يبقى بلا إشعارات إلى الأبد.
+  bool _pushRegistered = false;
+
   @override
   void initState() {
     super.initState();
@@ -80,6 +85,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     ref.read(appLockProvider.notifier).onForeground();
     ref.read(inboxProvider.notifier).start();
     unawaited(ref.read(outboxProvider.notifier).flush());
+    if (!_pushRegistered) unawaited(_registerPush());
   }
 
   void _onBackground() {
@@ -105,20 +111,26 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     }
   }
 
+  Future<void> _sendPushToken(String? token) async {
+    if (token == null) return;
+    try {
+      await ref.read(apiProvider).updateCurrentDevice(pushToken: token);
+      _pushRegistered = true;
+    } catch (_) {}
+  }
+
+  Future<void> _registerPush() async {
+    final push = ref.read(pushServiceProvider);
+    if (!push.available) return;
+    await _sendPushToken(await push.token());
+  }
+
   Future<void> _setupPush() async {
     final push = ref.read(pushServiceProvider);
     if (!push.available) return;
-    final api = ref.read(apiProvider);
-    Future<void> register(String? token) async {
-      if (token == null) return;
-      try {
-        await api.updateCurrentDevice(pushToken: token);
-      } catch (_) {}
-    }
-
-    await register(await push.token());
+    await _registerPush();
     _subs
-      ..add(push.onTokenRefresh.listen((t) => unawaited(register(t))))
+      ..add(push.onTokenRefresh.listen((t) => unawaited(_sendPushToken(t))))
       ..add(push.onOpened.listen((p) => ref.read(pendingDeepLinkProvider.notifier).set(p.conversationId)))
       ..add(push.onForeground.listen(_onForegroundPush));
     final initial = await push.initialMessage();

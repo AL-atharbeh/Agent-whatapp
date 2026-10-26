@@ -9,33 +9,32 @@ import { prisma } from "../src/lib/db";
  * كلفة الرد المقاسة (٢٥٠٠ توكن دخل + ٢٠٠ خرج):
  *   Groq   مجاني      ·  Haiku  $0.0035  ·  Sonnet $0.007  ·  Opus $0.0175
  *
- * المكالمات مستبعَدة من الجميع عمداً: كلفتها بالدقيقة لا بالرسالة، ولا يوجد
- * عدّاد دقائق بعد. بيعُها قبل بناء العدّاد هو بيع حدٍّ لا نستطيع فرضه.
+ * المكالمات في «الأعمال» وحدها: كلفتها بالدقيقة لا بالرسالة، وتُحتسب ردودها
+ * من نفس السقف اليومي إلى أن يُبنى عدّاد دقائق.
  *
  *   npm run seed:plans
  */
 
 const PLANS = [
   {
-    tier: "STARTER",
-    name: "البداية",
-    tagline: "لمحل واحد يبدأ على الواتساب",
+    tier: "STANDARD",
+    name: "اساسي",
+    tagline: "جرّب وكيلك على الواتساب",
     monthlyPrice: 19,
-    channels: ["WHATSAPP", "WEB"],
+    channels: ["WHATSAPP"],
     modelId: "qwen/qwen3.8-27b",
     effort: "low",
-    maxRepliesPerDay: 150,
-    maxRepliesPerMinute: 15,
-    maxProducts: 100,
+    maxRepliesPerDay: 169,
+    maxRepliesPerMinute: 20,
+    maxProducts: 50,
     sortOrder: 1,
     highlight: false,
     features: [
       "قناة واتساب",
-      "١٥٠ رد يومياً",
-      "١٠٠ منتج في الكتالوج",
+      "١٦٩ رد يومياً",
+      "٥٠ منتج في الكتالوج",
       "يفهم الفويس ويرد عليه",
       "تحويل تلقائي لموظف عند الحاجة",
-      "ساحة تجربة قبل التشغيل",
     ],
   },
   {
@@ -48,14 +47,15 @@ const PLANS = [
     effort: "low",
     maxRepliesPerDay: 300,
     maxRepliesPerMinute: 30,
-    maxProducts: 1000,
+    maxProducts: 200,
     sortOrder: 2,
     highlight: true,
     features: [
-      "واتساب وماسنجر وانستقرام",
+      "واتساب وماسنجر وانستقرام وموقعك",
       "٣٠٠ رد يومياً",
-      "١٠٠٠ منتج في الكتالوج",
+      "٢٠٠ منتج في الكتالوج",
       "ذكاء Claude — عربية أدق",
+      "حجز المواعيد وتذكير العملاء تلقائياً",
       "يفهم الفويس ويرد عليه",
       "أسعار حيّة تتحدّث يومياً",
       "سجل كامل للمحادثات والعملاء المحتملين",
@@ -66,19 +66,21 @@ const PLANS = [
     name: "الأعمال",
     tagline: "لمتجر كبير أو عدة فروع",
     monthlyPrice: 99,
-    channels: ["WHATSAPP", "MESSENGER", "INSTAGRAM", "WEB"],
-    modelId: "claude-sonnet-5-5",
+    channels: ["WHATSAPP", "MESSENGER", "INSTAGRAM", "WEB", "VOICE"],
+    modelId: "claude-haiku-5-5",
     effort: "low",
     maxRepliesPerDay: 400,
     maxRepliesPerMinute: 60,
-    maxProducts: 10000,
+    maxProducts: 500,
     sortOrder: 3,
     highlight: false,
     features: [
       "كل القنوات",
+      "يرد على المكالمات الهاتفية بصوت تختاره",
       "٤٠٠ رد يومياً",
-      "١٠٠٠٠ منتج في الكتالوج",
-      "ذكاء Claude Sonnet — الأعلى جودة",
+      "٥٠٠ منتج في الكتالوج",
+      "ذكاء Claude — عربية أدق",
+      "حجز المواعيد وتذكير العملاء تلقائياً",
       "يفهم الفويس ويرد عليه",
       "أسعار حيّة ومصادر بيانات خارجية",
       "تعليمات خاصة مفصّلة للوكيل",
