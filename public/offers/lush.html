@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta property="og:title" content="حاضر لصالون Lush">
+<meta property="og:description" content="كل زبونة بيوصلها رد، بأي ساعة، وموعدها بينحجز لحاله">
+<title>حاضر لصالون Lush</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alexandria:wght@500;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<style>
+/* تخطيط: عمود قراءة واحد على عرض الهاتف؛ الفقرات تُفصل بالمسافة، والبطاقة لما يُجرَّب أو يُحسب فقط (الرقم، المحادثة، الشاشات، الحاسبة) */
+:root {
+  --bg: #09090b;
+  --surface: #131418;
+  --surface-2: #1b1d23;
+  --line: #262830;
+  --fg: #f4f4f5;
+  --fg-2: #a3a3ad;
+  --fg-3: #6e707a;
+  --live: #34d399;
+  --live-dim: #34d39922;
+  --on-live: #04140c;
+  --bubble-in: #1f2128;
+  --bubble-out: #0f3b2c;
+  --strike: #fb7185;
+  --warn: #fbbf24;
+  --warn-dim: #fbbf241f;
+  --display: "Alexandria", "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+  --body: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+  color-scheme: dark;
+}
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.75; }
+.page {
+  max-width: 660px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 56px;
+  display: grid; gap: 72px;
+}
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; line-height: 1.3; }
+h1 { font-size: clamp(30px, 8vw, 46px); font-weight: 800; }
+h2 { font-size: clamp(22px, 5.6vw, 29px); font-weight: 700; }
+h3 { font-size: 17px; font-weight: 700; }
+p { margin: 0; }
+.eyebrow { font-family: var(--display); font-weight: 500; font-size: 13px; letter-spacing: .04em; color: var(--live); }
+.muted { color: var(--fg-2); }
+.small { font-size: 13.5px; color: var(--fg-3); }
+section { display: grid; gap: 20px; min-width: 0; }
+a { color: var(--live); }
+sup a { text-decoration: none; font-size: 11px; }
+.ltr { direction: ltr; unicode-bidi: isolate; }
+
+.brand { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 700; font-size: 15px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--live); box-shadow: 0 0 0 4px var(--live-dim); flex: none; }
+.hero { display: grid; gap: 18px; }
+.hero h1 em { font-style: normal; color: var(--live); }
+
+/* أرقام الافتتاح */
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.stats div { border-top: 2px solid var(--live); padding-top: 10px; display: grid; gap: 2px; min-width: 0; }
+.stats strong { font-family: var(--display); font-size: clamp(20px, 6vw, 28px); font-weight: 800; font-variant-numeric: tabular-nums; }
+.stats span { font-size: 13px; color: var(--fg-2); line-height: 1.5; }
+
+/* رقم التجربة */
+.try { background: var(--surface); border: 1px solid var(--live); border-radius: 22px; padding: 20px; display: grid; gap: 14px; }
+.number { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.number strong { font-family: var(--display); font-size: clamp(24px, 7vw, 32px); font-weight: 800; letter-spacing: .02em; }
+.btn { font: 600 14px var(--body); border-radius: 999px; padding: 8px 16px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.btn.primary { background: var(--live); color: var(--on-live); border-color: var(--live); }
+.btn:focus-visible { outline: 2px solid var(--live); outline-offset: 3px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: 500 14px var(--body); background: var(--surface-2); color: var(--fg); border: 1px dashed var(--line); border-radius: 12px; padding: 7px 12px; cursor: pointer; text-align: start; }
+.chip:hover { border-color: var(--live); }
+.chip:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+.toast { font-size: 13px; color: var(--live); min-height: 1.4em; }
+
+/* المحادثة */
+.phone { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 16px; display: grid; gap: 10px; }
+.phone-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; color: var(--fg-3); padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.msg { max-width: 84%; padding: 9px 13px; border-radius: 16px; font-size: 15px; line-height: 1.6; }
+.msg.in { background: var(--bubble-in); justify-self: start; border-start-start-radius: 4px; }
+.msg.out { background: var(--bubble-out); justify-self: end; border-start-end-radius: 4px; }
+.msg .who { display: block; font-size: 11.5px; color: var(--live); font-weight: 600; }
+.booked { justify-self: center; display: flex; gap: 8px; align-items: center; background: var(--live-dim); color: var(--live); border-radius: 999px; padding: 6px 14px; font-size: 13.5px; font-weight: 600; text-align: center; }
+@media (prefers-reduced-motion: no-preference) {
+  .phone .msg, .booked { animation: rise .5s cubic-bezier(.22,1,.36,1) both; }
+  .phone .msg:nth-of-type(2) { animation-delay: .15s } .phone .msg:nth-of-type(3) { animation-delay: .3s }
+  .phone .msg:nth-of-type(4) { animation-delay: .45s } .booked { animation-delay: .6s }
+  @keyframes rise { from { transform: translateY(6px); opacity: .4 } to { transform: none; opacity: 1 } }
+}
+
+/* المشاكل */
+.fixes { list-style: none; margin: 0; padding: 0; display: grid; }
+.fixes li { display: grid; gap: 4px; padding: 16px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.fixes li:first-child { border-top: 1px solid var(--line); }
+.was { color: var(--fg-3); font-size: 14.5px; text-decoration: line-through; text-decoration-color: var(--strike); text-decoration-thickness: 1.5px; }
+.now { font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.now::before { content: "✓"; color: var(--live); font-weight: 700; flex: none; }
+.tag { font: 600 12px var(--body); border-radius: 999px; padding: 1px 9px; white-space: nowrap; display: inline-block; }
+.tag.wip { background: var(--warn-dim); color: var(--warn); border: 1px solid var(--warn); }
+
+/* شاشات التطبيق والموقع */
+.screens { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.screen { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 14px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.screen-title { display: flex; justify-content: space-between; align-items: center; font-family: var(--display); font-weight: 500; font-size: 14px; }
+.screen-title span { font: 400 12px var(--body); color: var(--fg-3); }
+.row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; background: var(--surface-2); border-radius: 12px; padding: 8px 10px; font-size: 13px; min-width: 0; }
+.row b { font-family: var(--display); font-weight: 500; font-variant-numeric: tabular-nums; }
+.row .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.pill.ok { background: var(--live-dim); color: var(--live); }
+.pill.go { background: var(--warn-dim); color: var(--warn); }
+.pill.bot { background: var(--surface); color: var(--fg-2); border: 1px solid var(--line); }
+.can { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.can li { display: flex; gap: 10px; align-items: baseline; }
+.can li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--live); flex: none; transform: translateY(-2px); }
+
+/* المميزات */
+.groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 20px; }
+.group { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.group h3 { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; color: var(--fg-2); font-size: 14.5px; }
+.group.calls { grid-column: 1 / -1; border: 1px solid var(--warn); background: var(--warn-dim); border-radius: 18px; padding: 16px; }
+.group.calls ul { color: var(--fg); }
+
+/* خطوات */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; counter-reset: s; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 14px; align-items: start; }
+.steps li::before { content: counter(s, arabic-indic); font-family: var(--display); font-weight: 700; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--live); color: var(--live); }
+.steps b { font-family: var(--display); font-weight: 500; display: block; }
+
+/* الحاسبة */
+.calc { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 20px; display: grid; gap: 18px; }
+.field { display: grid; gap: 6px; }
+.field label { display: flex; justify-content: space-between; gap: 12px; font-size: 14.5px; color: var(--fg-2); }
+.field output { font-family: var(--display); color: var(--fg); font-variant-numeric: tabular-nums; flex: none; }
+input[type=range] { width: 100%; accent-color: var(--live); }
+input[type=range]:focus-visible { outline: 2px solid var(--live); outline-offset: 4px; }
+.result { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.result div { background: var(--surface-2); border-radius: 14px; padding: 14px; display: grid; gap: 2px; min-width: 0; }
+.result strong { font-family: var(--display); font-size: clamp(22px, 6vw, 28px); font-variant-numeric: tabular-nums; }
+.loss strong { color: var(--strike); }
+.back strong { color: var(--live); }
+.result .wide { grid-column: 1 / -1; }
+
+/* العرض */
+.offer { border: 1px solid var(--live); border-radius: 22px; padding: 22px; display: grid; gap: 14px; background: linear-gradient(180deg, var(--live-dim), transparent 75%); }
+.offer ul { margin: 0; padding-inline-start: 20px; display: grid; gap: 6px; }
+
+.notes { display: grid; gap: 6px; font-size: 12.5px; color: var(--fg-3); }
+.notes a { color: var(--fg-2); word-break: break-word; }
+footer { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+
+@media (max-width: 520px) {
+  .screens, .groups { grid-template-columns: 1fr; }
+}
+</style>
+<link rel="icon" href="/icon.svg">
+</head>
+<body>
+
+<div class="page" dir="rtl" lang="ar">
+
+  <header class="hero">
+    <div class="brand"><span class="dot"></span>حاضر · HADER</div>
+    <p class="eyebrow">مُعَدّ خصيصاً لصالون Lush</p>
+    <h1>كل زبونة بيوصلها رد، بأي ساعة، و<em>موعدها</em> بينحجز لحاله</h1>
+    <p class="muted">حاضر موظف استقبال ذكي بيشتغل على واتساب الصالون: بيرد بلهجتكم، بيعرف خدماتكم وأسعاركم، بيحجز بالوقت الفاضي فعلاً، بيذكّر الزبونة، وبيرجّعها لما يحين موعدها. وإنتو بتتابعوا كل إشي من تطبيق على جوالكم أو من الموقع، وبتتدخلوا وقت ما بدكم.</p>
+    <div class="stats">
+      <div><strong>٢٤/٧</strong><span>رد على كل رسالة، حتى بعد الدوام وبالعطل</span></div>
+      <div><strong>ثوانٍ</strong><span>من رسالة الزبونة لحد ما يظهر الموعد عندكم</span></div>
+      <div><strong>٤١٪</strong><span>أقل مواعيد فايتة مع رسائل التذكير<sup><a href="#n1">١</a></sup></span></div>
+    </div>
+  </header>
+
+  <section class="try" aria-labelledby="try-title">
+    <p class="eyebrow">جرّبوه هلأ من جوالكم</p>
+    <h2 id="try-title">ابعتوا رسالة واتساب على رقم التجربة</h2>
+    <div class="number">
+      <strong class="ltr">+962 7 7046 6649</strong>
+      <button class="btn" type="button" id="copyNum" data-copy="+962770466649">نسخ الرقم</button>
+      <a class="btn primary" href="https://wa.me/962770466649" target="_blank" rel="noopener">افتح واتساب</a>
+    </div>
+    <p class="muted">هاد رقم تجريبي تابع لنا، مربوط بحساب صالون Lush. أي رسالة بتبعتوها رح يرد عليها الوكيل كأنكم زبونة، والحجز رح يظهر فوراً بتطبيقكم. جرّبوا مثلاً (اكبسوا على الجملة لتنسخوها):</p>
+    <div class="chips" role="list">
+      <button class="chip" type="button" role="listitem">بدي موعد قص بكرا الساعة ٤</button>
+      <button class="chip" type="button" role="listitem">قديش سعر الصبغة؟ وقديش بتاخد وقت؟</button>
+      <button class="chip" type="button" role="listitem">مين فاضية يوم الخميس الصبح؟</button>
+      <button class="chip" type="button" role="listitem">بدي أأجّل موعدي لساعة ٦</button>
+      <button class="chip" type="button" role="listitem">شو عملتولي آخر مرة؟</button>
+      <button class="chip" type="button" role="listitem">بدي أحجز لبنتي كمان</button>
+    </div>
+    <p class="toast" id="toast" aria-live="polite"></p>
+  </section>
+
+  <section aria-label="مثال على محادثة حجز">
+    <div class="phone">
+      <div class="phone-head"><span>واتساب الصالون</span><span>مثال · ١١:٤٠ بالليل</span></div>
+      <p class="msg in">مرحبا، في مجال بكرا قص وسشوار؟</p>
+      <p class="msg out"><span class="who">حاضر</span>أهلين! بكرا فاضي الساعة ١١ الصبح مع رنا، أو ٤ العصر مع هبة. السعر من ١٠ لـ ٢٥ د.أ. أي وقت بناسبك؟</p>
+      <p class="msg in">٤ مع هبة</p>
+      <p class="msg out"><span class="who">حاضر</span>تمام، حجزتلك بكرا الساعة ٤ العصر مع هبة، والمدة ٤٥ دقيقة. رح يوصلك تذكير قبلها بيوم.</p>
+      <p class="booked">✓ الموعد ظهر بتطبيق الصالون فوراً</p>
+    </div>
+    <p class="small">رسالة بنص الليل كانت تستنى للصبح، وأحياناً الزبونة بتحجز عند غيركم. مع حاضر بتنحجز بدقيقة، وإنتو نايمين.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">اللي حكيتولنا عنه</p>
+    <h2>مشاكل صالون Lush، وكيف انحلّت كلها</h2>
+    <ul class="fixes">
+      <li><span class="was">نفس الخدمة بتاخد وقت مختلف لكل زبونة</span><span class="now">النظام بيتعلّم مدة كل زبونة من زياراتها السابقة، وبيحجزلها على قدّها</span></li>
+      <li><span class="was">وقت ضايع ومحجوز على الفاضي</span><span class="now">كبسة «انتهى» بتحرّر الوقت فوراً، والوكيل بيعرضه لزبونة جديدة</span></li>
+      <li><span class="was">التأخير بيوقع على اللي بعدها</span><span class="now">الزبونة الجاية بيوصلها تنبيه تلقائي بالوقت الجديد قبل ما تطلع من بيتها</span></li>
+      <li><span class="was">تسجيل الزبائن وأرقامهم يدوي</span><span class="now">كل رسالة واتساب بتصير ملف زبونة باسمها ورقمها، لحالها</span></li>
+      <li><span class="was">ما في مكان تحجز فيه الزبونة لحالها</span><span class="now">الحجز كله بمحادثة واتساب عادية، بدون ما تنزّل الزبونة أي تطبيق</span></li>
+      <li><span class="was">الأسعار من–إلى وبتلخبط</span><span class="now">السعر بينحكى للزبونة من–إلى، والسعر الفعلي بينكتب لما تخلص</span></li>
+      <li><span class="was">مين شغّالة ومين فاضية؟</span><span class="now">صفحة للموظفات بصورهن ودوامهن، وعمود لكل وحدة بجدول اليوم</span></li>
+      <li><span class="was">الزبونة بتغيب بدون ما تلغي</span><span class="now">تذكير قبل بيوم، وهي بترد «تأكيد» أو «إلغاء» على الواتساب، والغياب بينسجل لحاله</span></li>
+      <li><span class="was">وقت انتظار الصبغة بيروح هدر</span><span class="now">الموظفة بتنعرض فاضية خلاله، وبتاخد زبونة تانية</span></li>
+      <li><span class="was">الزبونة بتروح وما بترجع</span><span class="now">رسالة عودة تلقائية لما يحين موعدها الجاي، مثلاً بعد ٦ أسابيع من القص</span></li>
+      <li><span class="was">«شو الصبغة اللي حطيتولي آخر مرة؟»</span><span class="now">ملاحظات كل زيارة محفوظة بملفها، والوكيل نفسه بيجاوبها</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <p class="eyebrow">إنتو دايماً بالصورة</p>
+    <h2>تطبيق حاضر والموقع: كل إشي قدامكم</h2>
+    <p class="muted">الوكيل ما بيشتغل بالعتمة. كل رسالة، وكل رد، وكل حجز بتشوفوه لحظة بلحظة، ووقت ما بدكم بتردّوا إنتو.</p>
+    <div class="screens">
+      <div class="screen" aria-label="مثال على شاشة المحادثات">
+        <div class="screen-title">المحادثات <span>مثال</span></div>
+        <div class="row"><span class="pill bot">الوكيل</span><span class="txt">سارة: بدي موعد صبغة الخميس</span><b>٢د</b></div>
+        <div class="row"><span class="pill go">بدها موظف</span><span class="txt">لين: عندي سؤال عن عرض العروس</span><b>٥د</b></div>
+        <div class="row"><span class="pill ok">تم الحجز</span><span class="txt">رهف: تمام، بشوفكم بكرا</span><b>١٢د</b></div>
+      </div>
+      <div class="screen" aria-label="مثال على شاشة مواعيد اليوم">
+        <div class="screen-title">مواعيد اليوم <span>مثال</span></div>
+        <div class="row"><b>١١:٠٠</b><span class="txt">سارة · قص · رنا</span><span class="pill ok">مؤكد</span></div>
+        <div class="row"><b>١٢:٣٠</b><span class="txt">لين · صبغة · هبة</span><span class="pill go">جارٍ</span></div>
+        <div class="row"><b>٤:٠٠</b><span class="txt">رهف · سشوار · نور</span><span class="pill bot">محجوز</span></div>
+      </div>
+    </div>
+    <ul class="can">
+      <li>تشوفوا كل محادثة وشو ردّ الوكيل بالحرف.</li>
+      <li>تردّوا على الزبونة بنفسكم من التطبيق، والوكيل بيوقف بهديك المحادثة لحد ما ترجعوله إياها.</li>
+      <li>بيوصلكم إشعار لما زبونة تطلب موظف، أو سؤال الوكيل ما بيعرف جوابه.</li>
+      <li>جدول اليوم بكبسة: تأكيد، بدأ، انتهى، غياب، إلغاء، وحجز موعد جديد للي بتتصل أو بتيجي بنفسها.</li>
+      <li>ملف كل زبونة: زياراتها، شو عملت، ملاحظاتها، ومدتها المعتادة لكل خدمة.</li>
+      <li>من الموقع على الكمبيوتر نفس الإشي، وكمان بتعدّلوا الخدمات والأسعار والموظفات والأسئلة الشائعة.</li>
+      <li>التطبيق مقفول بالبصمة أو الوجه، فمحادثات الزبائن بتضل خاصة.</li>
+    </ul>
+  </section>
+
+  <section>
+    <p class="eyebrow">كل اللي بيقدّمه حاضر</p>
+    <h2>مش بس حجوزات</h2>
+    <div class="groups">
+      <div class="group">
+        <h3>الرد على الزبائن</h3>
+        <ul>
+          <li>واتساب وانستقرام وماسنجر من مكان واحد</li>
+          <li>بيحكي بلهجتكم، وبيفهم الرسائل الصوتية</li>
+          <li>بيعرف خدماتكم وأسعاركم وأسئلتكم الشائعة</li>
+          <li>بيحوّل لموظف لما الزبونة تطلب أو السؤال حساس</li>
+        </ul>
+      </div>
+      <div class="group">
+        <h3>المواعيد</h3>
+        <ul>
+          <li>حجز وتأجيل وإلغاء من الواتساب</li>
+          <li>مدة لكل زبونة، وأوقات انتظار الصبغة محسوبة</li>
+          <li>تذكير قبل بيوم، وتنبيه تأخير، ورسالة عودة</li>
+          <li>جدول بعمود لكل موظفة</li>
+        </ul>
+      </div>
+      <div class="group">
+        <h3>الزبائن</h3>
+        <ul>
+          <li>ملف تلقائي لكل زبونة برقمها</li>
+          <li>تاريخ زياراتها وملاحظات كل زيارة</li>
+          <li>مين غابت ومين صار وقت رجعتها</li>
+        </ul>
+      </div>
+      <div class="group">
+        <h3>الفريق والتقارير</h3>
+        <ul>
+          <li>الدخل والزيارات بالفترة اللي بتختاروها</li>
+          <li>أداء كل موظفة وعمولتها، بدل الحساب اليدوي</li>
+          <li>أكتر الخدمات طلباً</li>
+        </ul>
+      </div>
+      <div class="group calls">
+        <h3>المكالمات الهاتفية <span class="tag wip">قيد الانتهاء</span></h3>
+        <ul>
+          <li>حاضر رح يرد على تلفون الصالون نفسه، مش بس الواتساب.</li>
+          <li>بصوت إنتو بتختاروه وبتسمعوه قبل، وبيحجز ويسجّل الزبونة متل الواتساب بالزبط.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="calc-title">
+    <p class="eyebrow">الأرقام بتحكي</p>
+    <h2 id="calc-title">كم بيضيع على الصالون كل شهر؟</h2>
+    <p class="muted">حرّكوا الأرقام حسب صالونكم. القيم الموجودة مثال.</p>
+    <div class="calc">
+      <div class="field">
+        <label for="missed">رسائل حجز ما انردّ عليها بوقتها، بالأسبوع <output id="missedOut" for="missed">٢</output></label>
+        <input id="missed" type="range" min="0" max="20" step="1" value="2">
+      </div>
+      <div class="field">
+        <label for="noshow">زبونات بيغيبوا بدون ما يلغوا، بالأسبوع <output id="noshowOut" for="noshow">٢</output></label>
+        <input id="noshow" type="range" min="0" max="15" step="1" value="2">
+      </div>
+      <div class="field">
+        <label for="avg">متوسط فاتورة الزبونة (د.أ) <output id="avgOut" for="avg">١٥</output></label>
+        <input id="avg" type="range" min="5" max="80" step="5" value="15">
+      </div>
+      <div class="result">
+        <div class="loss wide"><span class="small">بيضيع على الصالون بالشهر</span><strong id="loss">٢٥٨ د.أ</strong><span class="small" id="lossYear">يعني حوالي ٣٬٠٩٦ د.أ بالسنة</span></div>
+        <div class="back"><span class="small">بيرجع لما كل رسالة ينرد عليها</span><strong id="back1">١٢٩ د.أ</strong></div>
+        <div class="back"><span class="small">بيرجع لما الغياب يقل ٤١٪<sup><a href="#n1">١</a></sup></span><strong id="back2">٥٣ د.أ</strong></div>
+      </div>
+      <p class="small">بدون حساب رسائل العودة اللي بترجّع زبونات كانوا رح يروحوا، وبدون الوقت اللي بتوفّره الاستقبال على الرد والتسجيل.</p>
+    </div>
+    <p class="muted">صالونات استعملت رسائل تذكير بيقدر الزبون يرد عليها بتأكيد أو إلغاء، متل اللي بيبعتها حاضر، بلّغت إن الغياب عندها قلّ للنص، ووصل لـ ٧٥٪ أقل عند الصالونات اللي كان غيابها عالي.<sup><a href="#n2">٢</a></sup></p>
+  </section>
+
+  <section>
+    <p class="eyebrow">من أول رسالة لآخر زيارة</p>
+    <h2>كيف بيمشي الموعد</h2>
+    <ol class="steps">
+      <li><div><b>الزبونة بتراسل</b><span class="muted">بأي وقت، حتى وإنتو مشغولين أو مسكّرين.</span></div></li>
+      <li><div><b>حاضر بيقترح أوقات فاضية فعلاً</b><span class="muted">حسب دوام كل موظفة ومدة الخدمة لهاي الزبونة بالذات.</span></div></li>
+      <li><div><b>بيحجز وبيظهر عندكم فوراً</b><span class="muted">على التطبيق والموقع، مع اسمها ورقمها والخدمة.</span></div></li>
+      <li><div><b>تذكير قبل بيوم</b><span class="muted">وهي بتأكد أو بتلغي، فالوقت ما بيضيع.</span></div></li>
+      <li><div><b>رسالة عودة بعد مدة الخدمة</b><span class="muted">فالزبونة بترجع بدون ما حدا يلحقها.</span></div></li>
+    </ol>
+  </section>
+
+  <section>
+    <p class="eyebrow">التجربة</p>
+    <h2>جرّبوه على صالونكم، بدون أي التزام</h2>
+    <ol class="steps">
+      <li><div><b>الموقع</b><span class="muted">ادخلوا على </span><a class="ltr" href="https://hader.shifracode.com/login" target="_blank" rel="noopener">hader.shifracode.com</a><span class="muted"> بالإيميل وكلمة السر اللي بعتناها إلكم.</span></div></li>
+      <li><div><b>التطبيق على الآيفون</b><span class="muted">نزّلوا تطبيق TestFlight من App Store، وافتحوا رابط حاضر اللي بيوصلكم منا، وادخلوا بنفس الإيميل وكلمة السر.</span></div></li>
+      <li><div><b>عدّلوا بياناتكم</b><span class="muted">الخدمات والأسعار والمدد وأسماء الموظفات وصورهن. حطّينا بيانات مبدئية، غيّروها براحتكم.</span></div></li>
+      <li><div><b>جرّبوا كأنكم زبائن</b><span class="muted">ابعتوا على رقم التجربة </span><span class="ltr">+962 7 7046 6649</span><span class="muted"> من أي جوال، وشوفوا الحجز يظهر بالتطبيق.</span></div></li>
+    </ol>
+    <p class="muted">وبنفضل معكم خلال التجربة: بنتواصل كل ٣ لـ ٤ أيام، بنسمع شو عجبكم وشو ناقص، وبنعدّله بسرعة.</p>
+    <p class="small">رقم الواتساب خلال التجربة تابع لنا. لما تشتركوا بنربط رقم الصالون نفسه، وبتضل كل بياناتكم وإعداداتكم متل ما هي.</p>
+  </section>
+
+  <section class="offer" aria-labelledby="offer-title">
+    <p class="eyebrow">عرض خاص لصالون Lush</p>
+    <h2 id="offer-title">نجاح صالونكم هو نجاحنا، وخلّونا نبنيه سوا</h2>
+    <ul>
+      <li>تجربة مجانية كاملة لمدة أسبوعين.</li>
+      <li>خصم خاص على أول ٣ شهور، مقابل رأيكم بكلمتين أو فيديو قصير بعد التجربة.</li>
+      <li>تجهيز كامل علينا: الخدمات، الأسعار، الموظفات، وربط رقم الصالون.</li>
+      <li>خلّونا نوريكم إياه بعشر دقايق بالصالون: بنحجز قدامكم من جوالنا، وبتشوفوا الموعد يوصل على جوالكم بنفس اللحظة.</li>
+    </ul>
+    <p>السعر بنحدده سوا حسب احتياج الصالون والقنوات اللي بدكم إياها. احكولنا على نفس الرقم اللي وصلتكم منه هالصفحة، وبنرتّب معكم العرض المناسب.</p>
+  </section>
+
+  <div class="notes" aria-label="المصادر">
+    <p id="n1">١. مراجعة منهجية لدراسات التذكير بالمواعيد (Opon وآخرون، ٢٠٢٠) وجدت إن المواعيد الفايتة قلّت بمعدل ٤١٪: <a href="https://www.one-health.panafrican-med-journal.com/content/article/2/9/full" target="_blank" rel="noopener">PAMJ One Health</a>. الدراسات من عيادات طبية، والنتيجة بتختلف من مكان لمكان.</p>
+    <p id="n2">٢. بيانات منشورة من شركة برامج صالونات (SalonIQ) عن صالونات مستخدمة عندها: <a href="https://saloniq.com/appointment-reminders-by-sms" target="_blank" rel="noopener">saloniq.com</a>.</p>
+  </div>
+
+  <footer>
+    <div class="brand"><span class="dot"></span>حاضر · من Shifra Code</div>
+    <p class="small">أي سؤال أو ملاحظة، احكولنا مباشرة وبنعدّل بسرعة.</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var toast = document.getElementById("toast");
+  var timer;
+  function say(t) { toast.textContent = t; clearTimeout(timer); timer = setTimeout(function () { toast.textContent = ""; }, 2500); }
+  function copy(text, done) {
+    var fallback = function () {
+      var r = document.createRange(), s = window.getSelection();
+      var el = document.createElement("span"); el.textContent = text; el.style.position = "fixed"; el.style.opacity = "0";
+      document.body.appendChild(el); r.selectNodeContents(el); s.removeAllRanges(); s.addRange(r);
+      try { document.execCommand("copy"); say(done); } catch (e) { say(text); }
+      s.removeAllRanges(); el.remove();
+    };
+    try {
+      navigator.clipboard.writeText(text).then(function () { say(done); }, fallback);
+    } catch (e) { fallback(); }
+  }
+  document.getElementById("copyNum").addEventListener("click", function () { copy(this.dataset.copy, "انسخ الرقم ✓"); });
+  document.querySelectorAll(".chip").forEach(function (c) {
+    c.addEventListener("click", function () { copy(c.textContent, "انسخت الجملة ✓ الصقوها بالواتساب"); });
+  });
+
+  var ar = function (n, d) { return Number(n).toLocaleString("ar-EG", { maximumFractionDigits: d || 0 }); };
+  var missed = document.getElementById("missed"), noshow = document.getElementById("noshow"), avg = document.getElementById("avg");
+  var WEEKS = 4.3, REDUCTION = 0.41;
+  function update() {
+    var m = +missed.value, n = +noshow.value, a = +avg.value;
+    var lostReplies = m * a * WEEKS, lostNoShow = n * a * WEEKS, total = lostReplies + lostNoShow;
+    document.getElementById("missedOut").textContent = ar(m);
+    document.getElementById("noshowOut").textContent = ar(n);
+    document.getElementById("avgOut").textContent = ar(a);
+    document.getElementById("loss").textContent = ar(total) + " د.أ";
+    document.getElementById("lossYear").textContent = "يعني حوالي " + ar(total * 12) + " د.أ بالسنة";
+    document.getElementById("back1").textContent = ar(lostReplies) + " د.أ";
+    document.getElementById("back2").textContent = ar(lostNoShow * REDUCTION) + " د.أ";
+  }
+  [missed, noshow, avg].forEach(function (i) { i.addEventListener("input", update); });
+  update();
+})();
+</script>
+
+</body>
+</html>
