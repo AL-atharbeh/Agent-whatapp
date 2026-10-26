@@ -16,7 +16,9 @@
     "seed:plans": "tsx --env-file=.env scripts/seed-plans.ts",
     "owner": "tsx --env-file=.env scripts/create-owner.ts",
     "demo:salon": "tsx --env-file=.env scripts/demo-salon.ts",
-    "vapi:whatsapp": "tsx --env-file=.env scripts/vapi-whatsapp-sip.ts"
+    "vapi:whatsapp": "tsx --env-file=.env scripts/vapi-whatsapp-sip.ts",
+    "email": "tsx --env-file=.env scripts/change-email.ts",
+    "clear:appointments": "tsx --env-file=.env scripts/clear-appointments.ts"
   },
   "prisma": {
     "seed": "tsx scripts/seed.ts"
