@@ -169,6 +169,10 @@ test("estimateFrom: بلا تاريخ للعميل ⇒ مقدّم الخدمة (
 test("estimateFrom: لا عيّنات ⇒ الافتراضي مقرّباً", () => {
   assert.deepEqual(estimateFrom([], [], 42), { minutes: 45, basis: "default", samples: 0 });
 });
+test("estimateFrom: مدة أقصر من ربع الافتراضي (زرّان ضُغطا معاً) لا تُتعلَّم", () => {
+  assert.deepEqual(estimateFrom([1], [1, 2], 45), { minutes: 45, basis: "default", samples: 0 });
+  assert.equal(estimateFrom([1, 40], [], 45).minutes, 40);
+});
 test("estimateFrom: العيّنات الصفرية تُهمَل", () => {
   assert.equal(estimateFrom([0, 0], [], 30).basis, "default");
 });

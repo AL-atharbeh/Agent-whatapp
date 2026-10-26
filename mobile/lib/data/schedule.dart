@@ -114,11 +114,13 @@ DurationEstimate estimateDuration({
   required List<int> staffActuals,
   required int defaultMinutes,
 }) {
-  final c = customerActuals.where((m) => m > 0).take(3).toList();
+  // أقصر من ربع الافتراضي: «بدأ» و«انتهى» ضُغطا معاً، لا خدمة قُدّمت — كالخادم
+  final floor = defaultMinutes / 4 < 5 ? 5 : defaultMinutes / 4;
+  final c = customerActuals.where((m) => m >= floor).take(3).toList();
   if (c.isNotEmpty) {
     return DurationEstimate(minutes: roundUp5(median(c)), basis: DurationBasis.customer, samples: c.length);
   }
-  final s = staffActuals.where((m) => m > 0).take(10).toList();
+  final s = staffActuals.where((m) => m >= floor).take(10).toList();
   if (s.isNotEmpty) {
     return DurationEstimate(minutes: roundUp5(median(s)), basis: DurationBasis.staff, samples: s.length);
   }

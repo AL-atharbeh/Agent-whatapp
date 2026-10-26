@@ -7,6 +7,7 @@ import {
   AppointmentError,
   bookAppointment,
   cancelAppointment,
+  completeIdentity,
   confirmAppointment,
   estimateMinutes,
   findSlots,
@@ -134,6 +135,7 @@ export function buildAppointmentTools(args: {
         log("list_services", {}, `${services.length} خدمة`);
         return out({
           customer_name: c.name,
+          customer_phone_known: !!c.phone,
           preferred_staff_id: c.preferredStaffId,
           services: services.map((s, i) => ({
             id: s.id,
@@ -213,12 +215,31 @@ export function buildAppointmentTools(args: {
       staff_id: ID,
       start: LOCAL,
       for_name: z.string().max(60).optional().describe("اسم الشخص إن كان الحجز لغير صاحب المحادثة"),
+      customer_name: z.string().max(60).optional().describe("اسم العميل نفسه إن لم يكن معروفاً"),
+      customer_phone: z.string().max(30).optional().describe("رقم هاتف العميل إن لم يكن معروفاً"),
     }),
     run: async (input) => {
       try {
         const startAt = parseLocal(input.start, tz);
         if (!startAt) return out({ ok: false, reason: "صيغة الوقت YYYY-MM-DD HH:MM" });
-        const c = await customer();
+        let c = await customer();
+
+        // موعد بلا اسم ولا رقم لا يعرف الفريق من صاحبه ولا كيف يصله.
+        // المكالمة من رقم مخفي (أو من المتصفح) لا رقم لها، فيُسأل عنه
+        const missing = [
+          !c.name && !input.customer_name?.trim() ? "الاسم" : null,
+          !c.phone && channel === "VOICE" && !input.customer_phone?.trim() ? "رقم الهاتف" : null,
+        ].filter(Boolean);
+        if (missing.length) {
+          return out({
+            ok: false,
+            code: "NEED_DETAILS",
+            reason: `اسأل العميل عن ${missing.join(" و")} ثم أعد الحجز ممرّراً customer_name وcustomer_phone.`,
+          });
+        }
+        if (input.customer_name?.trim() || input.customer_phone?.trim()) {
+          c = await completeIdentity(tenant.id, c, { name: input.customer_name, phone: input.customer_phone });
+        }
         const a = await bookAppointment(tenant.id, {
           customerId: c.id,
           serviceId: input.service_id,

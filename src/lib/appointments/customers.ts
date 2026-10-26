@@ -115,6 +115,31 @@ export async function upsertCustomerFromContact(
   }
 }
 
+/**
+ * يكمل هوية عميل مجهول من كلامه قبل الحجز: اسمه، ورقمه إن لم يكن معروفاً.
+ *
+ * رقم مسجّل لعميل آخر ⇒ الحجز يُسجَّل عليه (هو نفسه اتصل من رقم مخفي)،
+ * لكن القناة لا تُربط به: من يقول رقماً ليس رقمه لا يرى مواعيد صاحبه ولا
+ * يلغيها. أقصى ما يفعله موعدٌ زائد يراه الفريق باسم وهاتف حقيقيين.
+ */
+export async function completeIdentity(
+  tenantId: string,
+  c: Customer,
+  input: { name?: string | null; phone?: string | null },
+): Promise<Customer> {
+  const name = input.name ? displayName(input.name) : null;
+  const phone = c.phone ? undefined : await cleanPhone(tenantId, input.phone ?? undefined);
+
+  if (phone) {
+    const owner = await prisma.customer.findUnique({ where: { tenantId_phone: { tenantId, phone } } });
+    if (owner && owner.id !== c.id) {
+      return name && !owner.name ? prisma.customer.update({ where: { id: owner.id }, data: { name } }) : owner;
+    }
+  }
+  const data = { ...(name && !c.name ? { name } : {}), ...(phone ? { phone } : {}) };
+  return Object.keys(data).length ? prisma.customer.update({ where: { id: c.id }, data }) : c;
+}
+
 // ═══════════════════════════════════════════════════════════
 //  CRUD
 // ═══════════════════════════════════════════════════════════

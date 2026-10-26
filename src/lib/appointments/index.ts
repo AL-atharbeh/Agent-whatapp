@@ -70,6 +70,7 @@ export {
   toCustomerView,
   updateCustomer,
   upsertCustomerFromContact,
+  completeIdentity,
   type CustomerHistoryItem,
   type CustomerInput,
   type CustomerProfile,

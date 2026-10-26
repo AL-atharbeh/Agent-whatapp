@@ -42,6 +42,13 @@ export const CUSTOMER_SAMPLES = 3;
 export const STAFF_SAMPLES = 10;
 
 /**
+ * أقصر مدة فعلية تُصدَّق: ربع المدة الافتراضية (ولا أقل من ٥ دقائق).
+ * «بدأ» ثم «انتهى» بعد ثوانٍ زرّان ضُغطا معاً لا خدمة قُدّمت — ولو تُعلِّمت
+ * لحُجزت خدمة الـ٤٥ دقيقة بخمس، وتراكبت المواعيد بعدها.
+ */
+export const minPlausibleMinutes = (defaultMinutes: number) => Math.max(5, defaultMinutes / 4);
+
+/**
  * التقدير من العيّنات، بالترتيب: تاريخ العميل ⇐ تاريخ مقدّم الخدمة ⇐ الافتراضي.
  * العيّنات مرتّبة الأحدث أولاً ومقصوصة من المنادي؛ القصّ هنا احتياط.
  */
@@ -50,9 +57,10 @@ export function estimateFrom(
   staffMinutes: number[],
   defaultMinutes: number,
 ): Estimate {
-  const c = customerMinutes.filter((x) => x > 0).slice(0, CUSTOMER_SAMPLES);
+  const min = minPlausibleMinutes(defaultMinutes);
+  const c = customerMinutes.filter((x) => x >= min).slice(0, CUSTOMER_SAMPLES);
   if (c.length) return { minutes: roundUp5(median(c)!), basis: "customer", samples: c.length };
-  const s = staffMinutes.filter((x) => x > 0).slice(0, STAFF_SAMPLES);
+  const s = staffMinutes.filter((x) => x >= min).slice(0, STAFF_SAMPLES);
   if (s.length) return { minutes: roundUp5(median(s)!), basis: "staff", samples: s.length };
   return { minutes: roundUp5(defaultMinutes), basis: "default", samples: 0 };
 }
