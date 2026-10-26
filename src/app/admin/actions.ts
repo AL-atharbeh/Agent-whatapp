@@ -12,6 +12,7 @@ import { decrypt, encrypt } from "@/lib/crypto";
 import { checkTemplateBody, createTemplate } from "@/lib/channels/meta";
 import { sendHumanReply, startWhatsappConversation } from "@/lib/outbound";
 import { report } from "./report";
+import { VOICE_MODELS, normalizeE164 } from "@/lib/voice/settings";
 
 /**
  * إجراءات إدارة المتاجر — يستخدمها مالك المنصة وأصحاب المتاجر معاً.
@@ -486,6 +487,52 @@ export async function rotateVoiceToken(formData: FormData) {
   const token = `vk_${crypto.randomUUID().replace(/-/g, "")}`;
   await prisma.tenant.update({ where: { id: tenantId }, data: { voiceToken: token } });
   revalidatePath(`/admin/${slug}/channels`);
+}
+
+/**
+ * صوت المكالمات للمتجر: رقمه عند منصة المكالمات، والصوت، والجملة الأولى.
+ *
+ * الرقم فريد بين المتاجر — به تُعرف المكالمة لمن. رقم مكتوب بصيغة لا تُفهم
+ * يُرفض برسالة بدل أن يُحفظ فارغاً بصمت فتصل مكالماته لا أحد.
+ */
+export async function saveVoiceSettings(formData: FormData) {
+  await requireAdmin(); // الربط بمنصة المكالمات بيد مالك المنصة
+  const slug = s(formData.get("slug"))!;
+  const path = `/admin/${slug}/channels`;
+  try {
+    const tenantId = await authorizeTenant(slug);
+    const rawPhone = s(formData.get("voicePhone"));
+    const voicePhone = rawPhone ? normalizeE164(rawPhone) : null;
+    if (rawPhone && !voicePhone) throw new Error("رقم المكالمات بصيغة دولية: +9627xxxxxxxx");
+
+    const picked = s(formData.get("voiceId"));
+    const custom = s(formData.get("customVoiceId"));
+    const voiceId = picked === "custom" ? custom : picked;
+    if (voiceId && !/^[A-Za-z0-9_-]{6,64}$/.test(voiceId)) throw new Error("معرّف الصوت غير صالح — انسخه من ElevenLabs كما هو");
+    const model = s(formData.get("voiceModel"));
+
+    const clash = voicePhone
+      ? await prisma.tenant.findFirst({ where: { voicePhone, NOT: { id: tenantId } }, select: { name: true } })
+      : null;
+    if (clash) throw new Error(`الرقم مربوط بمتجر آخر: ${clash.name}`);
+
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        voicePhone,
+        voiceSettings: {
+          voiceId: voiceId || null,
+          voiceName: s(formData.get("voiceName")),
+          voiceModel: VOICE_MODELS.find((m) => m === model) ?? VOICE_MODELS[0],
+          firstMessage: s(formData.get("firstMessage")),
+          vapiPhoneNumberId: s(formData.get("vapiPhoneNumberId")),
+        },
+      },
+    });
+  } catch (err) {
+    report(err, path);
+  }
+  revalidatePath(path);
 }
 
 /** يوقف المكالمات بإزالة السرّ — لا سرّ، لا نداء مقبول. */

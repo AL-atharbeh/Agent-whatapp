@@ -4,11 +4,15 @@ import {
   deleteChannel,
   revokeVoiceToken,
   rotateVoiceToken,
+  saveVoiceSettings,
   saveChannel,
   subscribeChannel,
 } from "../../actions";
 import { CHANNELS } from "../../types";
 import { SubmitButton } from "@/components/pending";
+import { Suspense } from "react";
+import { ActionError } from "@/components/action-error";
+import { VOICE_CATALOG, VOICE_MODELS, defaultFirstMessage, voiceSettingsOf } from "@/lib/voice/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -92,15 +96,105 @@ export default async function ChannelsPage({
   const { slug } = await params;
   const tenant = await prisma.tenant.findUnique({
     where: { slug },
-    select: { id: true, voiceToken: true },
+    select: {
+      id: true, voiceToken: true, voicePhone: true, voiceSettings: true, name: true, agentName: true,
+    },
   });
   if (!tenant) notFound();
 
   const accounts = await prisma.channelAccount.findMany({ where: { tenantId: tenant.id } });
   const base = process.env.APP_BASE_URL ?? "http://localhost:3000";
 
+  const voice = voiceSettingsOf(tenant.voiceSettings);
+  const inCatalog = !voice.voiceId || VOICE_CATALOG.some((v) => v.id === voice.voiceId);
+  const canPreview = !!process.env.ELEVENLABS_API_KEY;
+
   return (
     <>
+      {/* ── صوت المكالمات: لكل متجر صوته ورقمه ── */}
+      <div className="card" id="voice">
+        <Suspense fallback={null}>
+          <ActionError />
+        </Suspense>
+        <h3>صوت المكالمات</h3>
+        <p className="hint">
+          مساعد واحد في منصة المكالمات لكل المتاجر؛ حين تصله مكالمة يسأل حاضر عن صاحب
+          الرقم فيردّ بصوت هذا المتجر وجملته الأولى ووكيله.
+        </p>
+        <form action={saveVoiceSettings}>
+          <input type="hidden" name="slug" value={slug} />
+          <div className="grid2">
+            <label>
+              <span>رقم المكالمات (دولي)</span>
+              <input name="voicePhone" dir="ltr" defaultValue={tenant.voicePhone ?? ""} placeholder="+9626xxxxxxx" />
+            </label>
+            <label>
+              <span>معرّف رقم Vapi (لعناوين SIP بلا رقم — اختياري)</span>
+              <input name="vapiPhoneNumberId" dir="ltr" defaultValue={voice.vapiPhoneNumberId ?? ""} />
+            </label>
+          </div>
+          <div className="grid2">
+            <label>
+              <span>الصوت</span>
+              <select name="voiceId" defaultValue={inCatalog ? (voice.voiceId ?? "") : "custom"}>
+                <option value="">صوت المساعد الافتراضي</option>
+                {VOICE_CATALOG.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+                <option value="custom">صوت آخر — أكتب معرّفه</option>
+              </select>
+            </label>
+            <label>
+              <span>معرّف صوت ElevenLabs (لـ «صوت آخر»)</span>
+              <input name="customVoiceId" dir="ltr" defaultValue={inCatalog ? "" : (voice.voiceId ?? "")} />
+            </label>
+          </div>
+          <div className="grid2">
+            <label>
+              <span>اسم الصوت (للتذكّر)</span>
+              <input name="voiceName" defaultValue={voice.voiceName ?? ""} placeholder="Sara — هادئة" />
+            </label>
+            <label>
+              <span>جودة الصوت</span>
+              <select name="voiceModel" defaultValue={voice.voiceModel}>
+                {VOICE_MODELS.map((m) => (
+                  <option key={m} value={m}>
+                    {m === "eleven_multilingual_v2" ? "طبيعي (أوضح)" : "سريع (أقل طبيعية)"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label>
+            <span>الجملة الأولى</span>
+            <input
+              name="firstMessage"
+              defaultValue={voice.firstMessage ?? ""}
+              placeholder={defaultFirstMessage({ agentName: tenant.agentName, name: tenant.name })}
+            />
+          </label>
+          <SubmitButton>حفظ صوت المكالمات</SubmitButton>
+        </form>
+        {canPreview && voice.voiceId && (
+          <div style={{ marginTop: 14 }}>
+            <p className="hint" style={{ margin: "0 0 6px" }}>اسمع الصوت المحفوظ:</p>
+            <audio
+              controls
+              preload="none"
+              src={`/api/admin/voice-preview?voiceId=${voice.voiceId}&model=${voice.voiceModel}&text=${encodeURIComponent(
+                voice.firstMessage ?? defaultFirstMessage({ agentName: tenant.agentName, name: tenant.name }),
+              )}`}
+            />
+          </div>
+        )}
+        <p className="hint" style={{ marginTop: 14 }}>
+          في Vapi: على الرقم ضع <b>Server URL</b> = <code dir="ltr">{base}/api/voice/vapi</code> مع ترويسة{" "}
+          <code dir="ltr">x-hader-secret</code>، واترك المساعد فارغاً — حاضر يختاره لكل مكالمة.
+        </p>
+      </div>
+
       {/* ── المكالمات ── */}
       <div className="card">
         <h3>المكالمات الصوتية</h3>

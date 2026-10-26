@@ -212,6 +212,14 @@ model Tenant {
   voiceToken String? @unique
 
   /**
+   * رقم المكالمات (E.164) — به يعرف حاضر لأي متجر مكالمةٌ تصله منصة المكالمات.
+   * منصة واحدة ومساعد واحد للمنصة كلها؛ ما يميّز متجراً عن آخر هو الرقم المطلوب.
+   */
+  voicePhone String? @unique
+  /// { voiceId, voiceName, voiceModel, firstMessage, vapiPhoneNumberId } — lib/voice/settings.ts
+  voiceSettings Json?
+
+  /**
    * وحدة المواعيد — اختيارية لأي نشاط بالمواعيد (عيادة، صالون، مركز صيانة…)،
    * يفعّلها مالك المنصة لمتجر بعينه.
    * بدونها لا أدوات حجز للوكيل ولا صفحات ولا مهام مجدولة: متجر ذهب لا

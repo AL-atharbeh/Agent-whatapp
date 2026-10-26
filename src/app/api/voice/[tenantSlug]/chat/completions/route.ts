@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { prisma } from "@/lib/db";
 import { runAgentTurn } from "@/lib/agent/engine";
 import { loadTenantById, tenantScope } from "@/lib/tenancy";
@@ -32,6 +33,11 @@ function textOf(content: unknown): string {
       .join(" ");
   }
   return "";
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const h = (v: string) => crypto.createHash("sha256").update(v).digest();
+  return crypto.timingSafeEqual(h(a), h(b));
 }
 
 function sse(payload: unknown): string {
@@ -72,9 +78,14 @@ export async function POST(
     select: { id: true, voiceToken: true, status: true, subscription: true, plan: true },
   });
 
+  // سرّ المتجر، أو سرّ المنصة: منصة المكالمات تحفظ مفتاح «Custom LLM» واحداً
+  // لكل الحساب، ومساعدها المشترك ينادي رابط كل متجر به (انظر api/voice/vapi).
+  const platform = process.env.VAPI_SERVER_SECRET;
+  const viaPlatform = !!platform && token.length > 0 && safeEqual(token, platform);
+
   // رسالة واحدة للمتجر غير الموجود وللسرّ الخاطئ — حتى لا تكشف الاستجابة
   // أي المتاجر موجودة عند من يجرّب عشوائياً.
-  if (!row?.voiceToken || row.voiceToken !== token) {
+  if (!row || (!viaPlatform && (!row.voiceToken || row.voiceToken !== token))) {
     return err(401, "متجر غير معروف أو سرّ غير صحيح");
   }
   if (row.status !== "ACTIVE") return err(403, "المتجر غير نشط");
@@ -89,6 +100,7 @@ export async function POST(
     user?: string;
     // Vapi يرسل المكالمة نفسها مع كل طلب: رقم المتصل ومعرّف المكالمة
     call?: { id?: string; customer?: { number?: string } };
+    customer?: { number?: string };
   };
   try {
     body = await req.json();
@@ -129,7 +141,7 @@ export async function POST(
   // المتصل: رقمه إن وصل (مكالمة واتساب أو هاتف) فيصير هو نفس عميل الرسائل
   // ويحجز باسمه. بلا رقم: معرّف المكالمة — معرّف ثابت مشترك كان سيجمع كل
   // المتصلين المجهولين في ملف عميل واحد تتراكم عليه حجوزات غرباء.
-  const number = (body.call?.customer?.number ?? "").replace(/\D/g, "");
+  const number = (body.call?.customer?.number ?? body.customer?.number ?? "").replace(/\D/g, "");
   const caller =
     number.length >= 8
       ? number
