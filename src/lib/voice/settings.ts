@@ -15,15 +15,6 @@ export type VoiceModel = (typeof VOICE_MODELS)[number];
 /** الأوضح صوتاً، وأبطأ بربع ثانية تقريباً من flash. */
 export const DEFAULT_VOICE_MODEL: VoiceModel = "eleven_multilingual_v2";
 
-/**
- * أصوات جاهزة للاختيار — معرّفات ElevenLabs. صوت خارجها يُكتب بمعرّفه.
- * أصوات «المكتبة» يجب أن تُضاف لحساب ElevenLabs المربوط بمنصة المكالمات
- * (Add to my voices) وإلا رفضتها المنصة.
- */
-export const VOICE_CATALOG: { id: string; name: string; gender: "female" | "male" }[] = [
-  { id: "6ZvbKYJmZfL6zVBzLwpV", name: "Lina — شابة، أسلوب محادثة (أردنية)", gender: "female" },
-];
-
 export type VoiceSettings = {
   voiceId: string | null;
   voiceName: string | null;

@@ -489,6 +489,33 @@ export async function rotateVoiceToken(formData: FormData) {
   revalidatePath(`/admin/${slug}/channels`);
 }
 
+/** يضيف صوتاً من مكتبة ElevenLabs لحساب المنصة؛ يعيد معرّفه في الحساب. */
+async function addLibraryVoice(ownerId: string, voiceId: string, name: string): Promise<string> {
+  const key = process.env.ELEVENLABS_API_KEY;
+  if (!key) throw new Error("أضف ELEVENLABS_API_KEY أو أضف الصوت يدوياً من ElevenLabs (Add to my voices)");
+  const r = await fetch(
+    `https://api.elevenlabs.io/v1/voices/add/${encodeURIComponent(ownerId)}/${encodeURIComponent(voiceId)}`,
+    {
+      method: "POST",
+      headers: { "xi-api-key": key, "Content-Type": "application/json" },
+      body: JSON.stringify({ new_name: name.slice(0, 60) }),
+    },
+  );
+  const text = await r.text();
+  if (!r.ok) {
+    // صوت مضاف سلفاً ليس خطأً: يُستعمل بمعرّفه
+    if (/already/i.test(text)) return voiceId;
+    console.error("[voice] إضافة صوت المكتبة:", r.status, text);
+    throw new Error("تعذّرت إضافة الصوت لحساب ElevenLabs — أعطِ المفتاح صلاحية Voices: Write أو أضفه يدوياً (Add to my voices)");
+  }
+  try {
+    const j = JSON.parse(text) as { voice_id?: string };
+    return j.voice_id ?? voiceId;
+  } catch {
+    return voiceId;
+  }
+}
+
 /**
  * صوت المكالمات للمتجر: رقمه عند منصة المكالمات، والصوت، والجملة الأولى.
  *
@@ -505,10 +532,15 @@ export async function saveVoiceSettings(formData: FormData) {
     const voicePhone = rawPhone ? normalizeE164(rawPhone) : null;
     if (rawPhone && !voicePhone) throw new Error("رقم المكالمات بصيغة دولية: +9627xxxxxxxx");
 
-    const picked = s(formData.get("voiceId"));
     const custom = s(formData.get("customVoiceId"));
-    const voiceId = picked === "custom" ? custom : picked;
+    let voiceId = custom ?? s(formData.get("voiceId"));
     if (voiceId && !/^[A-Za-z0-9_-]{6,64}$/.test(voiceId)) throw new Error("معرّف الصوت غير صالح — انسخه من ElevenLabs كما هو");
+    const voiceName = custom ? null : s(formData.get("voiceName"));
+
+    // صوت من المكتبة ليس في الحساب: منصة المكالمات ترفضه في منتصف المكالمة،
+    // فنضيفه الآن — والفشل هنا رسالة واضحة بدل خط صامت لاحقاً
+    const owner = custom ? null : s(formData.get("voiceOwnerId"));
+    if (voiceId && owner) voiceId = await addLibraryVoice(owner, voiceId, voiceName ?? voiceId);
     const model = s(formData.get("voiceModel"));
 
     const clash = voicePhone
@@ -522,7 +554,7 @@ export async function saveVoiceSettings(formData: FormData) {
         voicePhone,
         voiceSettings: {
           voiceId: voiceId || null,
-          voiceName: s(formData.get("voiceName")),
+          voiceName,
           voiceModel: VOICE_MODELS.find((m) => m === model) ?? VOICE_MODELS[0],
           firstMessage: s(formData.get("firstMessage")),
           vapiPhoneNumberId: s(formData.get("vapiPhoneNumberId")),

@@ -12,7 +12,8 @@ import { CHANNELS } from "../../types";
 import { SubmitButton } from "@/components/pending";
 import { Suspense } from "react";
 import { ActionError } from "@/components/action-error";
-import { VOICE_CATALOG, VOICE_MODELS, defaultFirstMessage, voiceSettingsOf } from "@/lib/voice/settings";
+import { VOICE_MODELS, defaultFirstMessage, voiceSettingsOf } from "@/lib/voice/settings";
+import { VoicePicker } from "./voice-picker";
 
 export const dynamic = "force-dynamic";
 
@@ -106,7 +107,6 @@ export default async function ChannelsPage({
   const base = process.env.APP_BASE_URL ?? "http://localhost:3000";
 
   const voice = voiceSettingsOf(tenant.voiceSettings);
-  const inCatalog = !voice.voiceId || VOICE_CATALOG.some((v) => v.id === voice.voiceId);
   const canPreview = !!process.env.ELEVENLABS_API_KEY;
 
   return (
@@ -133,28 +133,11 @@ export default async function ChannelsPage({
               <input name="vapiPhoneNumberId" dir="ltr" defaultValue={voice.vapiPhoneNumberId ?? ""} />
             </label>
           </div>
+          <VoicePicker initialId={voice.voiceId} initialName={voice.voiceName} />
           <div className="grid2">
             <label>
-              <span>الصوت</span>
-              <select name="voiceId" defaultValue={inCatalog ? (voice.voiceId ?? "") : "custom"}>
-                <option value="">صوت المساعد الافتراضي</option>
-                {VOICE_CATALOG.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name}
-                  </option>
-                ))}
-                <option value="custom">صوت آخر — أكتب معرّفه</option>
-              </select>
-            </label>
-            <label>
-              <span>معرّف صوت ElevenLabs (لـ «صوت آخر»)</span>
-              <input name="customVoiceId" dir="ltr" defaultValue={inCatalog ? "" : (voice.voiceId ?? "")} />
-            </label>
-          </div>
-          <div className="grid2">
-            <label>
-              <span>اسم الصوت (للتذكّر)</span>
-              <input name="voiceName" defaultValue={voice.voiceName ?? ""} placeholder="Sara — هادئة" />
+              <span>أو معرّف صوت من ElevenLabs مباشرة (اختياري)</span>
+              <input name="customVoiceId" dir="ltr" placeholder="يتقدّم على الاختيار أعلاه" />
             </label>
             <label>
               <span>جودة الصوت</span>
