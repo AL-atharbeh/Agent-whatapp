@@ -130,7 +130,9 @@ export default async function DayView({ tenantId, slug, base, sp }: ViewProps) {
           <Link className="btn ghost" href={`${base}?date=${addDays(date, -1)}`} aria-label="اليوم السابق">
             →
           </Link>
-          <input type="date" name="date" defaultValue={date} aria-label="التاريخ" style={{ width: "auto" }} />
+          {/* key: التنقّل بالأسهم لا يعيد تحميل الصفحة، و defaultValue لا يتحدّث بعد
+              أول عرض — فيبقى الحقل على اليوم القديم والجدول على الجديد */}
+          <input key={date} type="date" name="date" defaultValue={date} aria-label="التاريخ" style={{ width: "auto" }} />
           <Link className="btn ghost" href={`${base}?date=${addDays(date, 1)}`} aria-label="اليوم التالي">
             ←
           </Link>
@@ -242,7 +244,7 @@ export default async function DayView({ tenantId, slug, base, sp }: ViewProps) {
               </label>
               <label>
                 <span>اليوم</span>
-                <input type="date" name="bdate" defaultValue={bdate} />
+                <input key={bdate} type="date" name="bdate" defaultValue={bdate} />
               </label>
             </div>
             <button type="submit" className="ghost">
